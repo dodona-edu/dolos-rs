@@ -2,10 +2,7 @@ use std::collections::HashMap;
 use crate::suffixtree::node::{Node, LetterType};
 use crate::suffixtree::pair_array::PairArray;
 use crate::suffixtree::pair_bitmap::PairBitmap;
-use crate::suffixtree::tree::Tree;
-
-/// Sentinel value used to represent the start-of-string (no character to the left)
-const START_OF_STRING_SENTINEL: LetterType = usize::MAX;
+use crate::suffixtree::tree::{Tree, SENTINEL_LETTER};
 
 /// Represents a starting position of a match in the input sequences
 #[derive(Debug, Clone)]
@@ -147,11 +144,11 @@ impl<'a> MaximalMatchAnalyzer<'a> {
                 // depth equals the suffix length, so start = seq_len - depth
                 let start_index = seq_len - depth;
 
-                // Get the character to the left of this match, or START_OF_STRING_SENTINEL if at the beginning
+                // Get the character to the left of this match, or STRING_SENTINEL if at the beginning
                 let left_char = if start_index > 0 {
                     self.inputs[input][start_index - 1]
                 } else {
-                    START_OF_STRING_SENTINEL
+                    SENTINEL_LETTER
                 };
 
                 let mut map = HashMap::new();
@@ -218,8 +215,8 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     /// Check if two position groups should be paired based on their left characters
     #[inline]
     fn should_process_pair(&self, left_char: LetterType, other_left_char: LetterType) -> bool {
-        // Process pairs where left characters differ, or where left_char is START_OF_STRING_SENTINEL (start of string)
-        other_left_char != left_char || left_char == START_OF_STRING_SENTINEL
+        // Process pairs where left characters differ, or where left_char is STRING_SENTINEL (start of string)
+        other_left_char != left_char || left_char == SENTINEL_LETTER
     }
 
     /// Process all pairs between two position groups

@@ -1,6 +1,8 @@
 use crate::suffixtree::node::{Node, LetterType};
 use crate::suffixtree::tree_builder::TreeBuilder;
 
+pub const SENTINEL_LETTER: LetterType = usize::MAX;
+
 #[derive(Debug, PartialEq)]
 pub struct Tree {
     pub arena: Vec<Node>,

@@ -8,6 +8,7 @@ use crate::winnowing::report::Report;
 use crate::winnowing::tokens::Winnow;
 use std::path::PathBuf;
 use std::rc::Rc;
+use crate::suffixtree::tree::SENTINEL_LETTER;
 
 pub struct Index {
     pub k: usize,
@@ -40,7 +41,7 @@ impl Index {
         let tree = self.tokenizer.parse(&path);
         let tokens = tree.tokens();
         let mut fingerprints = tokens.winnow(self.k, self.w);
-        fingerprints.push(usize::MAX);
+        fingerprints.push(SENTINEL_LETTER);
         self.data.push(fingerprints);
 
         let file = Rc::new(File {
