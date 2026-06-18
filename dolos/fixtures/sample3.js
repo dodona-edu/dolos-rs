@@ -1,23 +1,24 @@
 class Pearson {
   // Initialiseer de hashfunctie met een vervangingstabel en combinatiefunctie.
   constructor(tabel, combineer) {
-    this.tabel = tabel || [...new Array(256).keys()];
-    if (this.tabel.length !== 256) {
-      throw "AssertionError: ongeldige tabel";
-    }
+    this.tabel = tabel || [...Array(256).keys()].reverse();
+    this.combineer = combineer || ((h, v) => (h ^ v) % 256);
     for (let i = 0; i < 256; i++) {
       if (!this.tabel.includes(i)) {
         throw "AssertionError: ongeldige tabel";
       }
     }
-    this.combineer = combineer || ((h, v) => (h + v) % 256);
+    if (this.tabel.length !== 256) {
+      throw "AssertionError: ongeldige tabel";
+    }
   }
 
   // Bereken de hashwaarde van een string via de vervangingstabel.
   hash(s) {
     let h = 0;
-    for (let c of s) {
-      h = this.tabel[this.combineer(h, c.charCodeAt(0))];
+    for (const c of s) {
+      const code = c.charCodeAt(0);
+      h = this.tabel[this.combineer(h, code)];
     }
     return h;
   }
