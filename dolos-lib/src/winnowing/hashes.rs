@@ -8,7 +8,7 @@ pub type Hash = usize;
 ///
 /// Javascript has 53-bit precision numbers (doubles) so we pick the largest
 /// prime number with 26 bits.
-const MOD: usize = 33554393;
+const MOD: u64 = 33554393;
 
 /// The base (or radix) used in the hash calculation for rolling hashes.
 ///
@@ -16,7 +16,7 @@ const MOD: usize = 33554393;
 /// bits as possible because they share the same modulus.
 ///
 /// We have chosen for the largest prime with 22 bits.
-const BASE_ROLLING: usize = 4194301;
+const BASE_ROLLING: u64 = 4194301;
 
 /// The base (or radix) used in the hash calculation for token hashes.
 ///
@@ -26,26 +26,31 @@ const BASE_ROLLING: usize = 4194301;
 /// as possible.
 ///
 /// Hence this is the largest prime number such that 127 * BASE_TOKEN < MOD.
-const BASE_TOKEN: usize = 747287;
+const BASE_TOKEN: u64 = 747287;
 
 /// Implementation of a rolling hash function.
 ///
 /// This should be an equivalent implementation of the npm @dodona/dolos-lib
 /// package's hashing function. Because of this, the hashes do not use the full
-/// range provided by 64-bit usize numbers.
+/// range provided by 64-bit numbers.
+///
+/// The arithmetic below is done in `u64` even though the resulting hashes
+/// (bounded by `MOD`, ~2^25) fit in 32 bits: the intermediate products (e.g.
+/// `BASE_ROLLING * hash`) reach ~2^47-2^50 and would silently overflow a
+/// 32-bit `usize` on targets like `wasm32`.
 pub struct RollingHash {
     k: usize,
-    max_base: usize,
-    memory: Vec<usize>,
+    max_base: u64,
+    memory: Vec<u64>,
     i: usize,
-    hash: usize,
+    hash: u64,
 }
 
 impl RollingHash {
     pub fn new(k: usize) -> Self {
         RollingHash {
             k,
-            max_base: MOD - mod_exp(BASE_ROLLING, k, MOD),
+            max_base: MOD - mod_exp(BASE_ROLLING, k as u64, MOD),
             memory: vec![0; k],
             i: 0,
             hash: 0,
@@ -54,10 +59,11 @@ impl RollingHash {
 
     /// Adds a token to the rolling hash and calculates the new hash value.
     pub fn next_hash(&mut self, token: usize) -> Hash {
+        let token = token as u64;
         self.hash = (BASE_ROLLING * self.hash + token + self.max_base * self.memory[self.i]) % MOD;
         self.memory[self.i] = token;
         self.i = (self.i + 1) % self.k;
-        self.hash
+        self.hash as Hash
     }
 }
 
@@ -65,13 +71,13 @@ impl RollingHash {
 pub fn hash_token(token: &str) -> Hash {
     token
         .bytes()
-        .fold(0, |hash, byte| ((hash + byte as usize) * BASE_TOKEN) % MOD)
+        .fold(0u64, |hash, byte| ((hash + byte as u64) * BASE_TOKEN) % MOD) as Hash
 }
 
 /// Modular exponentation without overflowing.
 ///
 /// Code based on the pseudocode at <https://en.wikipedia.org/wiki/Modular_exponentiation#Pseudocode>.
-const fn mod_exp(base: usize, exp: usize, modulus: usize) -> usize {
+const fn mod_exp(base: u64, exp: u64, modulus: u64) -> u64 {
     let mut y = 1;
     let mut b = base;
     let mut e = exp;
