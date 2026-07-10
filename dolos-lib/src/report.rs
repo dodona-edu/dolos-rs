@@ -1,10 +1,9 @@
-use crate::collections::pair_array::PairArray;
 use crate::config::{FragmentSortBy, PairSortBy};
 use crate::file::File;
 use crate::fragment::Fragment;
 use crate::metadata::Metadata;
-use crate::suffixtree::{AnalysisResult, Match, PairMetrics};
 use crate::winnowing::region::Region;
+use dolos_core::{AnalysisResult, Match, PairArray, PairMetrics};
 use std::cmp::Reverse;
 use std::rc::Rc;
 
@@ -128,13 +127,12 @@ fn sort_pairs(pairs: &mut [Pair], sort_by: &Option<PairSortBy>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::collections::pair_array::PairArray;
     use crate::config::{FragmentSortBy, PairSortBy};
     use crate::file::File;
     use crate::metadata::Metadata;
-    use crate::suffixtree::{AnalysisResult, Match, PairMetrics};
     use crate::winnowing::region::{Point, Region};
     use chrono::Utc;
+    use dolos_core::{AnalysisResult, Match, PairArray, PairMetrics};
     use std::path::PathBuf;
     use std::rc::Rc;
     use tree_sitter_grammars::Language;
