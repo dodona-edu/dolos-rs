@@ -15,4 +15,5 @@ pub use fragment::Fragment;
 pub use metadata::Metadata;
 pub use report::{Pair, Report};
 pub use tree_sitter_grammars::Language;
+pub use winnowing::fingerprints::Fingerprint;
 pub use winnowing::region::{Point, Region};

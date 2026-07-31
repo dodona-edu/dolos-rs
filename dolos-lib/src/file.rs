@@ -1,3 +1,5 @@
+use crate::winnowing::fingerprints::Fingerprint;
+use crate::winnowing::region::Region;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -9,6 +11,12 @@ pub struct File {
     pub relative_path: PathBuf,
     /// Full source text of the file.
     pub content: String,
+    /// The file's winnowed fingerprint sequence, present when
+    /// `--include-core-data` is set.
+    pub fingerprints: Option<Vec<Fingerprint>>,
+    /// Source region of each fingerprint, present when locations are kept
+    /// (fragments and/or `--include-core-data` require them).
+    pub regions: Option<Vec<Region>>,
 }
 
 impl Hash for File {

@@ -1,4 +1,4 @@
-use dolos::{Dolos, DolosConfig, PairSortBy};
+use dolos::{Dolos, DolosConfig, PairSortBy, Report};
 use rstest::rstest;
 use std::path::PathBuf;
 
@@ -17,10 +17,14 @@ fn to_path_buf(names: &[&str]) -> Vec<PathBuf> {
     names.iter().map(PathBuf::from).collect()
 }
 
-fn pair_sim(files: &[&str], config: DolosConfig) -> f64 {
-    let report = Dolos::new(to_path_buf(files), config)
+fn report(files: &[&str], config: DolosConfig) -> Report {
+    Dolos::new(to_path_buf(files), config)
         .unwrap()
-        .build_report();
+        .build_report()
+}
+
+fn pair_sim(files: &[&str], config: DolosConfig) -> f64 {
+    let report = report(files, config);
 
     report
         .pairs
@@ -74,9 +78,7 @@ fn test_similarities(
 
 #[test]
 fn test_two_files_have_fragments() {
-    let report = Dolos::new(to_path_buf(SAMPLE12), DolosConfig::default())
-        .unwrap()
-        .build_report();
+    let report = report(SAMPLE12, DolosConfig::default());
 
     for pair in &report.pairs {
         assert!(
@@ -88,9 +90,7 @@ fn test_two_files_have_fragments() {
 
 #[test]
 fn test_three_files_no_fragments() {
-    let report = Dolos::new(to_path_buf(SAMPLE123), DolosConfig::default())
-        .unwrap()
-        .build_report();
+    let report = report(SAMPLE123, DolosConfig::default());
 
     for pair in &report.pairs {
         assert!(
@@ -108,12 +108,10 @@ fn test_three_files_no_fragments() {
 #[case::total_overlap(PairSortBy::TotalOverlap)]
 #[case::longest_fragment(PairSortBy::LongestFragment)]
 fn test_sort_by(#[case] sort_by: PairSortBy) {
-    let report = Dolos::new(
-        to_path_buf(SAMPLE123),
+    let report = report(
+        SAMPLE123,
         DolosConfig::builder().sort_by(sort_by).build().unwrap(),
-    )
-    .unwrap()
-    .build_report();
+    );
 
     let ordered = match sort_by {
         PairSortBy::Similarity => is_sorted_desc(&report.pairs, |p| p.metrics.similarity),
@@ -125,6 +123,83 @@ fn test_sort_by(#[case] sort_by: PairSortBy) {
         }
     };
     assert!(ordered, "pairs not in descending order for {sort_by:?}");
+}
+
+// ── Fingerprint export ────────────────────────────────────────────────────────
+
+#[test]
+fn test_fingerprints_absent_by_default() {
+    let report = report(SAMPLE12, DolosConfig::default());
+    for file in &report.files {
+        assert!(file.fingerprints.is_none());
+    }
+}
+
+#[test]
+fn test_regions_absent_without_fragments_or_core_data() {
+    let report = report(SAMPLE123, DolosConfig::default());
+    for file in &report.files {
+        assert!(file.regions.is_none());
+    }
+}
+
+#[test]
+fn test_fingerprints_exported_with_ignore_file() {
+    let config = DolosConfig::builder()
+        .include_core_data(true)
+        .ignore("fixtures/sample_ignore.js")
+        .build()
+        .unwrap();
+    let report = report(SAMPLE12, config);
+
+    assert_eq!(report.files.len(), 2);
+    for file in &report.files {
+        let fingerprints = file
+            .fingerprints
+            .as_ref()
+            .expect("fingerprints are kept when include_core_data is set");
+        assert!(!fingerprints.is_empty());
+        let regions = file
+            .regions
+            .as_ref()
+            .expect("regions are kept when include_core_data is set");
+        assert_eq!(fingerprints.len(), regions.len());
+    }
+}
+
+#[test]
+fn test_three_files_export_fingerprints_without_fragments() {
+    let config = DolosConfig::builder()
+        .include_core_data(true)
+        .build()
+        .unwrap();
+    let report = report(SAMPLE123, config);
+
+    assert_eq!(report.files.len(), 3);
+    for file in &report.files {
+        assert!(file.fingerprints.is_some());
+        assert!(file.regions.is_some());
+    }
+    for pair in &report.pairs {
+        assert!(pair.fragments.is_none());
+    }
+}
+
+// ── Fragment ignored flags ────────────────────────────────────────────────────
+
+/// A run with a template file must flag the template-covered fragments as
+/// ignored while keeping genuine matches unflagged.
+#[test]
+fn test_fragments_carry_ignored_flags() {
+    let config = DolosConfig::builder()
+        .ignore("fixtures/sample_ignore.js")
+        .build()
+        .unwrap();
+    let report = report(SAMPLE12, config);
+
+    let fragments = report.pairs[0].fragments.as_ref().unwrap();
+    assert!(fragments.iter().any(|f| f.ignored));
+    assert!(fragments.iter().any(|f| !f.ignored));
 }
 
 // ── Input modes ───────────────────────────────────────────────────────────────

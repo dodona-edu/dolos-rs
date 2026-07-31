@@ -14,9 +14,12 @@ use std::rc::Rc;
 
 pub struct Dolos {
     metadata: Metadata,
-    files: Vec<Rc<File>>,
-    hashes: Vec<Vec<Fingerprint>>,
-    ignore_hashes: Vec<Vec<Fingerprint>>,
+    /// Relative display path of each regular file, parallel to `contents`,
+    /// `fingerprints`, and (when kept) `locations`.
+    paths: Vec<PathBuf>,
+    contents: Vec<String>,
+    fingerprints: Vec<Vec<Fingerprint>>,
+    ignore_fingerprints: Vec<Vec<Fingerprint>>,
     locations: Option<Vec<Vec<Region>>>,
     tokenizer: Tokenizer,
 }
@@ -34,21 +37,22 @@ impl Dolos {
         let metadata = Metadata::from_config(&config, &dataset);
 
         let tokenizer = Tokenizer::new(metadata.language);
-        let locations = metadata.include_fragments.then_some(Vec::new());
+        // Locations are needed to resolve fragments and to export fingerprints.
+        let keep_locations = metadata.include_fragments || metadata.include_core_data;
+        let locations = keep_locations.then_some(Vec::new());
 
         let mut dolos = Dolos {
             metadata,
-            files: Vec::new(),
-            hashes: Vec::new(),
-            ignore_hashes: Vec::new(),
+            paths: Vec::new(),
+            contents: Vec::new(),
+            fingerprints: Vec::new(),
+            ignore_fingerprints: Vec::new(),
             locations,
             tokenizer,
         };
 
         dolos.add_files(dataset.file_set)?;
 
-        // Ignore file is added after all regular files, so its word index is
-        // always >= regular_word_count.
         if let Some(ignore_path) = dolos.metadata.ignore.clone() {
             dolos.add_ignore_file(ignore_path)?;
         }
@@ -56,74 +60,64 @@ impl Dolos {
         Ok(dolos)
     }
 
-    /// Parse `content` into a fingerprint sequence (and optionally per-fingerprint
-    /// source locations when `keep_locations` is `true`).
-    fn fingerprint(
+    /// Read and tokenize a source file, optionally retaining fingerprint locations.
+    fn process_file(
         &mut self,
-        content: &str,
+        path: &Path,
         keep_locations: bool,
-    ) -> (Vec<Fingerprint>, Option<Vec<Region>>) {
-        self.tokenizer
-            .parse(content)
+    ) -> Result<(String, Vec<Fingerprint>, Option<Vec<Region>>)> {
+        if self.metadata.language_detected && !self.metadata.language.matches(path) {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!("Language does not match file: {}", path.display()),
+            ));
+        }
+
+        let content = std::fs::read_to_string(path).map_err(|e| {
+            Error::new(
+                e.kind(),
+                format!("Could not read file '{}': {}", path.display(), e),
+            )
+        })?;
+
+        let (fingerprints, locations) = self
+            .tokenizer
+            .parse(&content)
             .tokens(self.metadata.include_comments)
             .winnow(
                 self.metadata.kgram_length,
                 self.metadata.kgrams_in_window,
                 keep_locations,
-            )
+            );
+
+        Ok((content, fingerprints, locations))
     }
 
-    /// Tokenize a source file and register it as a regular file in the analysis.
-    ///
-    /// The file is added to `self.files`, its fingerprints to `self.hashes`, and
-    /// (when `keep_fragments` is set) its locations to `self.locations`.
-    fn add_file(&mut self, id: usize, base_dir: &Path, relative: &Path) -> Result<()> {
-        // Only enforce the language-extension match when the language was
-        // auto-detected.  If the user explicitly specified the language, they
-        // know what they want (e.g., files exported without an extension).
-        if !self.metadata.language_detected && !self.metadata.language.matches(relative) {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                format!("Language does not match file: {}", relative.display()),
-            ));
-        }
-
-        let content = std::fs::read_to_string(base_dir.join(relative))?;
-        let (hashes, locations) = self.fingerprint(&content, self.metadata.include_fragments);
-
-        self.hashes.push(hashes);
-        if let Some(locs) = self.locations.as_mut() {
-            locs.push(locations.expect("locations should be present when keep_fragments is true"));
-        }
-        self.files.push(Rc::new(File {
-            id,
-            relative_path: relative.to_path_buf(),
-            content,
-        }));
-        Ok(())
-    }
-
-    /// Tokenize a template/ignore file and append its fingerprints to the hash
-    /// list so that the suffix tree can suppress common matches.
-    ///
-    /// Ignore files are never added to `self.files` or `self.locations`: they
-    /// do not appear in the report, and no fragment resolution is needed for them.
+    /// Tokenize a template/ignore file and add its fingerprints to the ignore list.
     fn add_ignore_file(&mut self, path: PathBuf) -> Result<()> {
-        let content = std::fs::read_to_string(&path).map_err(|e| {
-            Error::new(
-                e.kind(),
-                format!("Could not read ignore file '{}': {}", path.display(), e),
-            )
-        })?;
-        let (hashes, _) = self.fingerprint(&content, false);
-        self.ignore_hashes.push(hashes);
+        let (_, fingerprints, _) = self.process_file(&path, false)?;
+        self.ignore_fingerprints.push(fingerprints);
         Ok(())
     }
 
     fn add_files(&mut self, file_set: FileSet) -> Result<()> {
-        for (id, relative) in file_set.relative_paths.iter().enumerate() {
-            self.add_file(id, &file_set.base_dir, relative)?;
+        for relative in &file_set.relative_paths {
+            let path = file_set.base_dir.join(relative);
+            let keep_locations = self.locations.is_some();
+
+            let (content, fingerprints, locations) = self.process_file(&path, keep_locations)?;
+
+            self.fingerprints.push(fingerprints);
+
+            if let Some(stored_locations) = self.locations.as_mut() {
+                stored_locations
+                    .push(locations.expect("locations should be present when they are kept"));
+            }
+
+            self.paths.push(relative.to_path_buf());
+            self.contents.push(content);
         }
+
         Ok(())
     }
 
@@ -134,8 +128,34 @@ impl Dolos {
             keep_matches: self.metadata.include_fragments,
             max_seq_count: self.metadata.max_fingerprint_file_count,
         };
-        let result = dolos_core::analyze(&self.hashes, &self.ignore_hashes, &options);
-        Report::new(result, self.files, self.locations, self.metadata)
+        let result = dolos_core::analyze(&self.fingerprints, &self.ignore_fingerprints, &options);
+
+        let keep_fingerprints = self.metadata.include_core_data;
+        let mut fingerprints = self.fingerprints.into_iter();
+        let mut locations = self.locations.map(|l| l.into_iter());
+
+        let files: Vec<Rc<File>> = self
+            .paths
+            .into_iter()
+            .zip(self.contents)
+            .enumerate()
+            .map(|(id, (relative_path, content))| {
+                // Always advance the iterator to stay in lockstep with `paths`,
+                // even when the vector itself is discarded below.
+                let file_fingerprints = fingerprints.next().expect("one fingerprint vec per file");
+                Rc::new(File {
+                    id,
+                    relative_path,
+                    content,
+                    fingerprints: keep_fingerprints.then_some(file_fingerprints),
+                    regions: locations
+                        .as_mut()
+                        .map(|l| l.next().expect("one region vec per file")),
+                })
+            })
+            .collect();
+
+        Report::new(result, files, self.metadata)
     }
 }
 
@@ -144,7 +164,7 @@ impl fmt::Debug for Dolos {
         fmt.debug_struct("Dolos")
             .field("name", &self.metadata.report_name)
             .field("language", &self.metadata.language)
-            .field("files", &self.files)
+            .field("paths", &self.paths)
             .finish()
     }
 }

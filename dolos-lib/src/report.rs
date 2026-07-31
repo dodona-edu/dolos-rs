@@ -2,7 +2,6 @@ use crate::config::{FragmentSortBy, PairSortBy};
 use crate::file::File;
 use crate::fragment::Fragment;
 use crate::metadata::Metadata;
-use crate::winnowing::region::Region;
 use dolos_core::{AnalysisResult, Match, PairArray, PairMetrics};
 use std::cmp::Reverse;
 use std::rc::Rc;
@@ -23,20 +22,20 @@ pub struct Report {
 }
 
 impl Report {
-    /// Build a report by resolving raw matches against location data and sorting.
+    /// Build a report by resolving raw matches against each file's regions and
+    /// sorting.
     ///
-    /// The raw matches and locations are consumed to produce resolved
-    /// [`Fragment`]s, which are then sorted and stored alongside the pair metrics.
+    /// The raw matches are consumed to produce resolved [`Fragment`]s (using
+    /// each file's [`File::regions`]), which are then sorted and stored
+    /// alongside the pair metrics.
     pub fn new(
         analysis_result: AnalysisResult,
         files: Vec<Rc<File>>,
-        locations: Option<Vec<Vec<Region>>>,
         metadata: Metadata,
     ) -> Report {
         let AnalysisResult { metrics, matches } = analysis_result;
-        let mut frags = matches
-            .zip(locations)
-            .map(|(m, l)| Self::resolve_fragments(m, l, &metadata.fragment_sort_by));
+        let mut frags =
+            matches.map(|m| Self::resolve_fragments(m, &files, &metadata.fragment_sort_by));
 
         let mut pairs: Vec<Pair> = metrics
             .iter_pairs()
@@ -55,21 +54,29 @@ impl Report {
         Report { metadata, files, pairs }
     }
 
-    /// Resolve raw matches + locations into [`Fragment`] lists, sorted according
-    /// to `fragment_sort_by`.
+    /// Resolve raw matches into [`Fragment`] lists using each file's own
+    /// [`File::regions`], sorted according to `fragment_sort_by`.
     ///
     /// `FileOrder` and `None` both sort by left-file source position (row, column).
     fn resolve_fragments(
         raw_matches: PairArray<Vec<Match>>,
-        locations: Vec<Vec<Region>>,
+        files: &[Rc<File>],
         fragment_sort_by: &Option<FragmentSortBy>,
     ) -> PairArray<Vec<Fragment>> {
         let mut fragments = PairArray::new(raw_matches.size(), Vec::new());
 
         for (left, right, pair_matches) in raw_matches.iter_pairs() {
+            let left_regions = files[left]
+                .regions
+                .as_ref()
+                .expect("regions are kept when fragment resolution is enabled");
+            let right_regions = files[right]
+                .regions
+                .as_ref()
+                .expect("regions are kept when fragment resolution is enabled");
             let mut resolved: Vec<Fragment> = pair_matches
                 .iter()
-                .map(|m| Fragment::resolve(m, &locations[left], &locations[right]))
+                .map(|m| Fragment::resolve(m, left_regions, right_regions))
                 .collect();
             sort_fragments(&mut resolved, fragment_sort_by);
             fragments.set(left, right, resolved);
@@ -127,10 +134,11 @@ fn sort_pairs(pairs: &mut [Pair], sort_by: &Option<PairSortBy>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Point;
     use crate::config::{FragmentSortBy, PairSortBy};
     use crate::file::File;
     use crate::metadata::Metadata;
-    use crate::winnowing::region::{Point, Region};
+    use crate::winnowing::region::Region;
     use chrono::Utc;
     use dolos_core::{AnalysisResult, Match, PairArray, PairMetrics};
     use std::path::PathBuf;
@@ -152,6 +160,7 @@ mod tests {
             language_detected: true,
             include_comments: false,
             include_fragments: true,
+            include_core_data: false,
             min_length_match: 1,
             max_fingerprint_file_count: None,
             ignore: None,
@@ -161,23 +170,19 @@ mod tests {
     fn make_report(
         analysis: AnalysisResult,
         files: Vec<Rc<File>>,
-        locations: Option<Vec<Vec<Region>>>,
         sort_by: Option<PairSortBy>,
         fragment_sort_by: Option<FragmentSortBy>,
     ) -> Report {
-        Report::new(
-            analysis,
-            files,
-            locations,
-            make_metadata(sort_by, fragment_sort_by),
-        )
+        Report::new(analysis, files, make_metadata(sort_by, fragment_sort_by))
     }
 
-    fn make_file(id: usize, name: &str) -> Rc<File> {
+    fn make_file(id: usize, name: &str, regions: Option<Vec<Region>>) -> Rc<File> {
         Rc::new(File {
             id,
             relative_path: PathBuf::from(name),
             content: "".to_string(),
+            fingerprints: None,
+            regions,
         })
     }
 
@@ -197,9 +202,9 @@ mod tests {
     #[test]
     fn test_from() {
         let files = vec![
-            make_file(0, "a.js"),
-            make_file(1, "b.js"),
-            make_file(2, "c.js"),
+            make_file(0, "a.js", None),
+            make_file(1, "b.js", None),
+            make_file(2, "c.js", None),
         ];
         let mut metrics = PairArray::new(3, PairMetrics::default());
         metrics.set(0, 1, make_metrics(0.5));
@@ -207,7 +212,7 @@ mod tests {
         metrics.set(1, 2, make_metrics(0.8));
 
         let analysis = AnalysisResult { metrics, matches: None };
-        let report = make_report(analysis, files.clone(), None, None, None);
+        let report = make_report(analysis, files.clone(), None, None);
 
         assert_eq!(report.pairs.len(), 3);
 
@@ -233,28 +238,39 @@ mod tests {
     #[test]
     fn test_resolve_fragments() {
         // Two locations per file (two fingerprints each)
-        let locations = vec![
-            vec![
-                Region::new(Point::new(0, 0), Point::new(0, 5)),
-                Region::new(Point::new(1, 0), Point::new(1, 5)),
-            ],
-            vec![
-                Region::new(Point::new(10, 0), Point::new(10, 5)),
-                Region::new(Point::new(11, 0), Point::new(11, 5)),
-            ],
+        let files = vec![
+            make_file(
+                0,
+                "a.js",
+                Some(vec![
+                    Region::new(Point::new(0, 0), Point::new(0, 5)),
+                    Region::new(Point::new(1, 0), Point::new(1, 5)),
+                ]),
+            ),
+            make_file(
+                1,
+                "b.js",
+                Some(vec![
+                    Region::new(Point::new(10, 0), Point::new(10, 5)),
+                    Region::new(Point::new(11, 0), Point::new(11, 5)),
+                ]),
+            ),
         ];
 
         let mut raw_matches: PairArray<Vec<Match>> = PairArray::new(2, Vec::new());
         raw_matches.set(
             0,
             1,
-            vec![Match { left_start: 0, right_start: 0, length: 2, ignored: false }],
+            vec![
+                Match { left_start: 0, right_start: 0, length: 2, ignored: false },
+                Match { left_start: 1, right_start: 1, length: 1, ignored: true },
+            ],
         );
 
-        let fragments = Report::resolve_fragments(raw_matches, locations, &None);
+        let fragments = Report::resolve_fragments(raw_matches, &files, &None);
         let frags = fragments.get(0, 1);
 
-        assert_eq!(frags.len(), 1);
+        assert_eq!(frags.len(), 2);
         let f = &frags[0];
         assert_eq!(f.fingerprint_count, 2);
         // Spans from start of first loc to end of last loc
@@ -262,6 +278,10 @@ mod tests {
         assert_eq!(f.left_region.end_point, Point::new(1, 5));
         assert_eq!(f.right_region.start_point, Point::new(10, 0));
         assert_eq!(f.right_region.end_point, Point::new(11, 5));
+
+        // The ignored flag must survive resolution.
+        assert!(!frags[0].ignored);
+        assert!(frags[1].ignored);
     }
 
     /// `test_all_pairs` verifies that `pairs` returns exactly all
@@ -269,13 +289,13 @@ mod tests {
     #[test]
     fn test_all_pairs() {
         let files = vec![
-            make_file(0, "x.js"),
-            make_file(1, "y.js"),
-            make_file(2, "z.js"),
+            make_file(0, "x.js", None),
+            make_file(1, "y.js", None),
+            make_file(2, "z.js", None),
         ];
         let metrics = PairArray::new(3, make_metrics(0.0));
         let analysis = AnalysisResult { metrics, matches: None };
-        let report = make_report(analysis, files.clone(), None, None, None);
+        let report = make_report(analysis, files.clone(), None, None);
 
         assert_eq!(report.pairs.len(), 3);
 
@@ -294,9 +314,9 @@ mod tests {
     #[test]
     fn test_sort_by_similarity() {
         let files = vec![
-            make_file(0, "a.js"),
-            make_file(1, "b.js"),
-            make_file(2, "c.js"),
+            make_file(0, "a.js", None),
+            make_file(1, "b.js", None),
+            make_file(2, "c.js", None),
         ];
         let mut metrics = PairArray::new(3, PairMetrics::default());
         metrics.set(0, 1, make_metrics(0.5));
@@ -304,7 +324,7 @@ mod tests {
         metrics.set(1, 2, make_metrics(0.8));
 
         let analysis = AnalysisResult { metrics, matches: None };
-        let report = make_report(analysis, files, None, Some(PairSortBy::Similarity), None);
+        let report = make_report(analysis, files, Some(PairSortBy::Similarity), None);
 
         let similarities: Vec<f64> = report.pairs.iter().map(|p| p.metrics.similarity).collect();
         assert_eq!(similarities, vec![0.8, 0.5, 0.2]);
@@ -315,13 +335,25 @@ mod tests {
     #[test]
     fn test_fragment_sort_by_kgrams_descending() {
         // Three fingerprint locations per file
-        let locations: Vec<Vec<Region>> = vec![
-            (0..3)
-                .map(|r| Region::new(Point::new(r, 0), Point::new(r, 5)))
-                .collect(),
-            (10..13)
-                .map(|r| Region::new(Point::new(r, 0), Point::new(r, 5)))
-                .collect(),
+        let files = vec![
+            make_file(
+                0,
+                "a.js",
+                Some(
+                    (0..3)
+                        .map(|r| Region::new(Point::new(r, 0), Point::new(r, 5)))
+                        .collect(),
+                ),
+            ),
+            make_file(
+                1,
+                "b.js",
+                Some(
+                    (10..13)
+                        .map(|r| Region::new(Point::new(r, 0), Point::new(r, 5)))
+                        .collect(),
+                ),
+            ),
         ];
         // Two matches: one covering 1 fingerprint, one covering 2
         let mut raw_matches: PairArray<Vec<Match>> = PairArray::new(2, Vec::new());
@@ -340,8 +372,7 @@ mod tests {
         };
         let report = make_report(
             analysis,
-            vec![make_file(0, "a.js"), make_file(1, "b.js")],
-            Some(locations),
+            files,
             None,
             Some(FragmentSortBy::KgramsDescending),
         );

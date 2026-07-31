@@ -43,6 +43,52 @@ fn smoke_csv_output() {
     assert!(report_dir.join("metadata.csv").exists());
     assert!(report_dir.join("files.csv").exists());
     assert!(report_dir.join("fragments.csv").exists());
+
+    let pairs_csv = std::fs::read_to_string(report_dir.join("pairs.csv")).unwrap();
+    let pairs_header = pairs_csv.lines().next().unwrap();
+    assert_eq!(
+        pairs_header,
+        "file1_id,file1_path,file2_id,file2_path,similarity,longest,totalLeft,totalRight,overlapLeft,overlapRight"
+    );
+
+    let metadata_csv = std::fs::read_to_string(report_dir.join("metadata.csv")).unwrap();
+    let metadata_header = metadata_csv.lines().next().unwrap();
+    assert_eq!(metadata_header, "property,value");
+
+    let files_csv = std::fs::read_to_string(report_dir.join("files.csv")).unwrap();
+    let files_header = files_csv.lines().next().unwrap();
+    assert_eq!(files_header, "id,path,content");
+
+    let fragments_csv = std::fs::read_to_string(report_dir.join("fragments.csv")).unwrap();
+    let fragments_header = fragments_csv.lines().next().unwrap();
+    assert_eq!(
+        fragments_header,
+        "file1_id,file1_path,file1_start_point,file1_end_point,file2_id,file2_path,file2_start_point,file2_end_point,fingerprint_count,ignored"
+    );
+}
+
+#[test]
+fn csv_output_with_fingerprints() {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = tmp.path().join("report");
+    #[rustfmt::skip]
+    dolos_run(
+        &[SAMPLE1, SAMPLE2],
+        &[
+            "-f", "csv",
+            "-o", report_dir.to_str().unwrap(),
+            "--include-core-data",
+        ],
+    )
+    .assert()
+    .success();
+
+    let files_csv = std::fs::read_to_string(report_dir.join("files.csv")).unwrap();
+    let files_header = files_csv.lines().next().unwrap();
+    assert!(files_header.ends_with("fingerprints,fingerprint_regions"));
+
+    let metadata_csv = std::fs::read_to_string(report_dir.join("metadata.csv")).unwrap();
+    assert!(metadata_csv.contains("includeCoreData,true"));
 }
 
 #[test]
