@@ -105,10 +105,8 @@ impl Dolos {
 
     fn add_files(&mut self, file_set: FileSet) -> Result<()> {
         for relative in &file_set.relative_paths {
-            let path = file_set.base_dir.join(relative);
-            let keep_locations = self.locations.is_some();
-
-            let (content, fingerprints, locations) = self.process_file(&path, keep_locations)?;
+            let (content, fingerprints, locations) =
+                self.process_file(&file_set.base_dir.join(relative), self.locations.is_some())?;
 
             self.fingerprints.push(fingerprints);
 
@@ -133,9 +131,11 @@ impl Dolos {
         };
         let result = dolos_core::analyze(&self.fingerprints, &self.ignore_fingerprints, &options);
 
-        let keep_fingerprints = self.metadata.include_core_data;
-        let mut fingerprints = self.fingerprints.into_iter();
-        let mut locations = self.locations.map(|l| l.into_iter());
+        let mut core_data = self
+            .metadata
+            .include_core_data
+            .then(|| Some(self.fingerprints.into_iter().zip(self.locations?)))
+            .flatten();
 
         let files: Vec<Rc<File>> = self
             .paths
@@ -143,18 +143,8 @@ impl Dolos {
             .zip(self.contents)
             .enumerate()
             .map(|(id, (relative_path, content))| {
-                // Always advance the iterator to stay in lockstep with `paths`,
-                // even when the vector itself is discarded below.
-                let file_fingerprints = fingerprints.next().expect("one fingerprint vec per file");
-                Rc::new(File {
-                    id,
-                    relative_path,
-                    content,
-                    fingerprints: keep_fingerprints.then_some(file_fingerprints),
-                    regions: locations
-                        .as_mut()
-                        .map(|l| l.next().expect("one region vec per file")),
-                })
+                let (fingerprints, regions) = core_data.as_mut().and_then(Iterator::next).unzip();
+                Rc::new(File { id, relative_path, content, fingerprints, regions })
             })
             .collect();
 
