@@ -38,8 +38,11 @@ impl Dolos {
 
         let tokenizer = Tokenizer::new(metadata.language);
         // Locations are needed to resolve fragments and to export fingerprints.
-        let keep_locations = metadata.include_fragments || metadata.include_core_data;
-        let locations = keep_locations.then_some(Vec::new());
+        let locations = if metadata.include_fragments || metadata.include_core_data {
+            Some(Vec::new())
+        } else {
+            None
+        };
 
         let mut dolos = Dolos {
             metadata,
