@@ -1,12 +1,13 @@
 use crate::config::DolosConfig;
-use crate::file::{File, FileSet};
+use crate::file::{CoreData, File, FileSet};
+use crate::fragment::resolve_fragments;
 use crate::metadata::Metadata;
 use crate::reader::Dataset;
 use crate::report::Report;
 use crate::winnowing::fingerprints::{Fingerprint, Winnow};
 use crate::winnowing::region::Region;
 use crate::winnowing::tokenizer::{Tokenizer, Tokens};
-use dolos_core::AnalysisOptions;
+use dolos_core::{AnalysisOptions, AnalysisResult};
 use std::fmt;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
@@ -37,7 +38,7 @@ impl Dolos {
         let metadata = Metadata::from_config(&config, &dataset);
 
         let tokenizer = Tokenizer::new(metadata.language);
-        // Locations are needed to resolve fragments and to export fingerprints.
+
         let locations = if metadata.include_fragments || metadata.include_core_data {
             Some(Vec::new())
         } else {
@@ -129,13 +130,24 @@ impl Dolos {
             keep_matches: self.metadata.include_fragments,
             max_seq_count: self.metadata.max_fingerprint_file_count,
         };
-        let result = dolos_core::analyze(&self.fingerprints, &self.ignore_fingerprints, &options);
+        let AnalysisResult { metrics, matches } =
+            dolos_core::analyze(&self.fingerprints, &self.ignore_fingerprints, &options);
 
-        let mut core_data = self
-            .metadata
-            .include_core_data
-            .then(|| Some(self.fingerprints.into_iter().zip(self.locations?)))
-            .flatten();
+        let fragments = matches
+            .zip(self.locations.as_deref())
+            .map(|(matches, locations)| {
+                resolve_fragments(matches, locations, &self.metadata.fragment_sort_by)
+            });
+
+        let mut core_data = self.metadata.include_core_data.then(|| {
+            self.fingerprints
+                .into_iter()
+                .zip(
+                    self.locations
+                        .expect("locations are present when core data is exported"),
+                )
+                .map(|(fingerprints, regions)| CoreData { fingerprints, regions })
+        });
 
         let files: Vec<Rc<File>> = self
             .paths
@@ -143,12 +155,16 @@ impl Dolos {
             .zip(self.contents)
             .enumerate()
             .map(|(id, (relative_path, content))| {
-                let (fingerprints, regions) = core_data.as_mut().and_then(Iterator::next).unzip();
-                Rc::new(File { id, relative_path, content, fingerprints, regions })
+                Rc::new(File {
+                    id,
+                    relative_path,
+                    content,
+                    core_data: core_data.as_mut().and_then(Iterator::next),
+                })
             })
             .collect();
 
-        Report::new(result, files, self.metadata)
+        Report::new(metrics, fragments, files, self.metadata)
     }
 }
 

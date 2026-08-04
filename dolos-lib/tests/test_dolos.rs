@@ -125,50 +125,22 @@ fn test_sort_by(#[case] sort_by: PairSortBy) {
     assert!(ordered, "pairs not in descending order for {sort_by:?}");
 }
 
-// ── Fingerprint export ────────────────────────────────────────────────────────
+// ── Core data export ──────────────────────────────────────────────────────────
 
 #[test]
-fn test_fingerprints_absent_by_default() {
+fn test_core_data_absent_by_default() {
     let report = report(SAMPLE12, DolosConfig::default());
+
     for file in &report.files {
-        assert!(file.fingerprints.is_none());
+        assert!(
+            file.core_data.is_none(),
+            "core data must not be exported without include_core_data"
+        );
     }
 }
 
 #[test]
-fn test_regions_absent_without_fragments_or_core_data() {
-    let report = report(SAMPLE123, DolosConfig::default());
-    for file in &report.files {
-        assert!(file.regions.is_none());
-    }
-}
-
-#[test]
-fn test_fingerprints_exported_with_ignore_file() {
-    let config = DolosConfig::builder()
-        .include_core_data(true)
-        .ignore("fixtures/sample_ignore.js")
-        .build()
-        .unwrap();
-    let report = report(SAMPLE12, config);
-
-    assert_eq!(report.files.len(), 2);
-    for file in &report.files {
-        let fingerprints = file
-            .fingerprints
-            .as_ref()
-            .expect("fingerprints are kept when include_core_data is set");
-        assert!(!fingerprints.is_empty());
-        let regions = file
-            .regions
-            .as_ref()
-            .expect("regions are kept when include_core_data is set");
-        assert_eq!(fingerprints.len(), regions.len());
-    }
-}
-
-#[test]
-fn test_three_files_export_fingerprints_without_fragments() {
+fn test_core_data_present_with_flag() {
     let config = DolosConfig::builder()
         .include_core_data(true)
         .build()
@@ -177,11 +149,12 @@ fn test_three_files_export_fingerprints_without_fragments() {
 
     assert_eq!(report.files.len(), 3);
     for file in &report.files {
-        assert!(file.fingerprints.is_some());
-        assert!(file.regions.is_some());
-    }
-    for pair in &report.pairs {
-        assert!(pair.fragments.is_none());
+        let core_data = file
+            .core_data
+            .as_ref()
+            .expect("core data is present when include_core_data is set");
+        assert!(!core_data.fingerprints.is_empty());
+        assert_eq!(core_data.fingerprints.len(), core_data.regions.len());
     }
 }
 

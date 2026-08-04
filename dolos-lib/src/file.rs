@@ -11,12 +11,18 @@ pub struct File {
     pub relative_path: PathBuf,
     /// Full source text of the file.
     pub content: String,
-    /// The file's winnowed fingerprint sequence, present when
-    /// `--include-core-data` is set.
-    pub fingerprints: Option<Vec<Fingerprint>>,
-    /// Source region of each fingerprint, present when locations are kept
-    /// (fragments and/or `--include-core-data` require them).
-    pub regions: Option<Vec<Region>>,
+    /// The file's winnowed fingerprint sequence and source regions, if `include_core_data` is set.
+    pub core_data: Option<CoreData>,
+}
+
+/// A file's winnowing output, exported so that a pair's fragments can be
+/// recomputed from the report alone.
+#[derive(Debug, Clone)]
+pub struct CoreData {
+    /// The file's winnowed fingerprint sequence.
+    pub fingerprints: Vec<Fingerprint>,
+    /// The source region of each fingerprint (same length as `fingerprints`).
+    pub regions: Vec<Region>,
 }
 
 impl Hash for File {

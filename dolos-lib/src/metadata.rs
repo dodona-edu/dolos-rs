@@ -26,8 +26,7 @@ pub struct Metadata {
     /// Whether per-pair code fragments were computed (`true` for exactly 2
     /// files or when `--compare` was passed).
     pub include_fragments: bool,
-    /// Whether per-file fingerprints (with source regions) are exported
-    /// with the report.
+    /// Whether the report carries the core data of the files.
     pub include_core_data: bool,
     pub min_length_match: usize,
     /// the maximum number of files a fingerprint may appear in before it is ignored,
