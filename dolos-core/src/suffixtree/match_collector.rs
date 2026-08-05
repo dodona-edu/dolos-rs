@@ -1,13 +1,14 @@
+use crate::Symbol;
 use crate::collections::pair_array::PairArray;
 use crate::collections::pair_bitmap::PairBitmap;
 use crate::collections::utils::ordered_pair_with;
 use crate::collections::vec_bitmap::VecBitmap;
-use crate::suffixtree::types::{AnalysisResult, Match, PairMetrics, StartPosition, SymbolType};
+use crate::suffixtree::types::{AnalysisResult, Match, PairMetrics, StartPosition};
 
 /// Collects and processes matches found during tree traversal.
 pub struct MatchCollector<'a> {
     /// The sequences being compared.
-    sequences: &'a [Vec<SymbolType>],
+    sequences: &'a [Vec<Symbol>],
     /// Tracks the longest matching fragment length for each pair of sequences.
     longest_fragments: PairArray<usize>,
     /// Bitmap tracking which positions have been covered by matches, per sequence pair.
@@ -17,7 +18,7 @@ pub struct MatchCollector<'a> {
     /// Only present when `exclude_ignored` is `true`. Used in [`build_metrics`]
     /// to subtract ignored positions from totals and to mask the overlap counts.
     ignore_bitmap: Option<VecBitmap>,
-    /// Per-pair list of maximal exact matches (only when fragment storage is enabled).
+    /// Per-pair list of maximal exact matches (only when `keep_matches` is enabled).
     matches: Option<PairArray<Vec<Match>>>,
 }
 
@@ -26,11 +27,7 @@ impl<'a> MatchCollector<'a> {
     ///
     /// Initializes the longest-fragment tracker and overlap bitmap with sizes
     /// derived from the length of each sequence.
-    pub fn new(
-        sequences: &'a [Vec<SymbolType>],
-        keep_fragments: bool,
-        exclude_ignored: bool,
-    ) -> Self {
+    pub fn new(sequences: &'a [Vec<Symbol>], keep_matches: bool, exclude_ignored: bool) -> Self {
         let sequence_lengths: Vec<usize> = sequences.iter().map(|s| s.len()).collect();
 
         Self {
@@ -38,14 +35,14 @@ impl<'a> MatchCollector<'a> {
             longest_fragments: PairArray::new(sequences.len(), 0),
             overlap_bitmap: PairBitmap::new(sequence_lengths.as_slice()),
             ignore_bitmap: exclude_ignored.then(|| VecBitmap::new(sequence_lengths.as_slice())),
-            matches: keep_fragments.then(|| PairArray::new(sequences.len(), Vec::new())),
+            matches: keep_matches.then(|| PairArray::new(sequences.len(), Vec::new())),
         }
     }
 
     /// Record a maximal match between two positions.
     ///
     /// Marks the covered positions in the overlap bitmap so overlapping matches
-    /// are not double-counted, and stores the match when fragment storage is
+    /// are not double-counted, and stores the match when `keep_matches` is
     /// enabled. When `is_ignored` is `false` the longest-fragment tracker is
     /// updated; ignored matches are excluded from that metric.
     pub fn record_match(

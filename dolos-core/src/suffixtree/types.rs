@@ -1,13 +1,11 @@
+use crate::Symbol;
 use crate::collections::pair_array::PairArray;
 
 /// Sentinel symbol used to mark the end of sequences.
-pub const SENTINEL_SYMBOL: SymbolType = usize::MAX;
+pub const SENTINEL_SYMBOL: Symbol = usize::MAX;
 
-/// Type that represents the index of a node in the arena part of the tree.
+/// Index of a node in the arena part of the tree.
 pub type NodeIndex = usize;
-
-/// Type that represents a single symbol in a sequence.
-pub type SymbolType = usize;
 
 /// Represents a starting position of a match in a sequence.
 ///
@@ -23,16 +21,16 @@ pub struct StartPosition {
 
 /// A maximal exact match between two positions in (possibly different) sequences.
 ///
-/// `left_start` and `right_start` are offsets into the fingerprint arrays of
-/// the left (smaller-index) and right (larger-index) files respectively.
-/// The owning [`PairArray`] tracks *which* files the pair refers to.
-#[derive(Debug, Clone)]
+/// `left_start` and `right_start` are offsets into the left (smaller-index)
+/// and right (larger-index) sequence respectively. The owning [`PairArray`]
+/// tracks *which* sequences the pair refers to.
+#[derive(Debug, Clone, PartialEq)]
 pub struct Match {
-    /// Start offset in the left file's fingerprint array.
+    /// Start offset in the left sequence.
     pub left_start: usize,
-    /// Start offset in the right file's fingerprint array.
+    /// Start offset in the right sequence.
     pub right_start: usize,
-    /// Number of consecutive matching fingerprints.
+    /// Number of consecutive matching symbols.
     pub length: usize,
     /// Whether this match comes from an ignored or too-common substring.
     ///
@@ -42,19 +40,19 @@ pub struct Match {
 }
 
 /// Per-pair metrics produced by the suffix-tree analysis.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct PairMetrics {
     /// Jaccard-style similarity: `(overlap_left + overlap_right) / (total_left + total_right)`.
     pub similarity: f64,
-    /// Total number of fingerprints in the left file.
+    /// Total number of symbols in the left sequence.
     pub total_left: usize,
-    /// Total number of fingerprints in the right file.
+    /// Total number of symbols in the right sequence.
     pub total_right: usize,
-    /// Number of fingerprints in the left file covered by at least one match.
+    /// Number of symbols in the left sequence covered by at least one match.
     pub overlap_left: usize,
-    /// Number of fingerprints in the right file covered by at least one match.
+    /// Number of symbols in the right sequence covered by at least one match.
     pub overlap_right: usize,
-    /// Length of the longest common substring (in fingerprints).
+    /// Length of the longest common substring (in symbols).
     pub longest_fragment: usize,
 }
 
