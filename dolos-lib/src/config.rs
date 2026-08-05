@@ -45,7 +45,7 @@ pub struct DolosConfig {
     pub ignore: Option<PathBuf>,
     pub include_comments: bool,
     pub compare: bool,
-    pub include_core_data: bool,
+    pub include_analysis_data: bool,
     pub min_length_match: usize,
     pub sort_by: Option<PairSortBy>,
     pub fragment_sort_by: Option<FragmentSortBy>,
@@ -84,7 +84,7 @@ impl Default for DolosConfig {
             ignore: None,
             include_comments: false,
             compare: false,
-            include_core_data: false,
+            include_analysis_data: false,
             min_length_match: 1,
             sort_by: None,
             fragment_sort_by: None,
@@ -176,8 +176,8 @@ impl DolosConfigBuilder {
         self
     }
 
-    pub fn include_core_data(mut self, v: bool) -> Self {
-        self.config.include_core_data = v;
+    pub fn include_analysis_data(mut self, v: bool) -> Self {
+        self.config.include_analysis_data = v;
         self
     }
 

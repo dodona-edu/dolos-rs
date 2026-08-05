@@ -134,7 +134,7 @@ fn test_core_data_absent_by_default() {
     for file in &report.files {
         assert!(
             file.core_data.is_none(),
-            "core data must not be exported without include_core_data"
+            "core data must not be exported without include_analysis_data"
         );
     }
 }
@@ -142,7 +142,7 @@ fn test_core_data_absent_by_default() {
 #[test]
 fn test_core_data_present_with_flag() {
     let config = DolosConfig::builder()
-        .include_core_data(true)
+        .include_analysis_data(true)
         .build()
         .unwrap();
     let report = report(SAMPLE123, config);
@@ -152,7 +152,7 @@ fn test_core_data_present_with_flag() {
         let core_data = file
             .core_data
             .as_ref()
-            .expect("core data is present when include_core_data is set");
+            .expect("core data is present when include_analysis_data is set");
         assert!(!core_data.fingerprints.is_empty());
         assert_eq!(core_data.fingerprints.len(), core_data.regions.len());
     }

@@ -11,7 +11,7 @@ pub struct File {
     pub relative_path: PathBuf,
     /// Full source text of the file.
     pub content: String,
-    /// The file's winnowed fingerprint sequence and source regions, if `include_core_data` is set.
+    /// The file's winnowed fingerprint sequence and source regions, if `include_analysis_data` is set.
     pub core_data: Option<CoreData>,
 }
 

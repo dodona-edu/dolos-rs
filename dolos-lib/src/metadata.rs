@@ -27,7 +27,7 @@ pub struct Metadata {
     /// files or when `--compare` was passed).
     pub include_fragments: bool,
     /// Whether the report carries the core data of the files.
-    pub include_core_data: bool,
+    pub include_analysis_data: bool,
     pub min_length_match: usize,
     /// the maximum number of files a fingerprint may appear in before it is ignored,
     /// taking the more restrictive of the absolute count (`-m`) and percentage-based (`-M`) limits.
@@ -66,7 +66,7 @@ impl Metadata {
             language_detected,
             include_comments: config.include_comments,
             include_fragments: file_count == 2 || config.compare,
-            include_core_data: config.include_core_data,
+            include_analysis_data: config.include_analysis_data,
             min_length_match: config.min_length_match,
             max_fingerprint_file_count,
             ignore: config.ignore.clone(),
@@ -87,7 +87,7 @@ impl Metadata {
             ("minLengthMatch", self.min_length_match.to_string()),
             ("includeComments", self.include_comments.to_string()),
             ("includeFragments", self.include_fragments.to_string()),
-            ("includeCoreData", self.include_core_data.to_string()),
+            ("includeCoreData", self.include_analysis_data.to_string()),
             ("maxFingerprintFileCount", optional(self.max_fingerprint_file_count.map(|v| v.to_string()))),
             ("sortBy", optional(self.sort_by.map(|s| format!("{s:?}")))),
             ("fragmentSortBy", optional(self.fragment_sort_by.map(|s| format!("{s:?}")))),

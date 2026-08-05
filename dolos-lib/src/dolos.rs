@@ -39,7 +39,7 @@ impl Dolos {
 
         let tokenizer = Tokenizer::new(metadata.language);
 
-        let locations = if metadata.include_fragments || metadata.include_core_data {
+        let locations = if metadata.include_fragments || metadata.include_analysis_data {
             Some(Vec::new())
         } else {
             None
@@ -139,7 +139,7 @@ impl Dolos {
                 resolve_fragments(matches, locations, &self.metadata.fragment_sort_by)
             });
 
-        let mut core_data = self.metadata.include_core_data.then(|| {
+        let mut core_data = self.metadata.include_analysis_data.then(|| {
             self.fingerprints
                 .into_iter()
                 .zip(
