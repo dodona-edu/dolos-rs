@@ -11,6 +11,13 @@ fn dolos_run(files: &[&str], args: &[&str]) -> Command {
     cmd
 }
 
+fn assert_csv_headers(path: &std::path::Path, expected: &[&str]) {
+    assert!(path.exists(), "{} does not exist", path.display());
+    let mut reader = csv::Reader::from_path(path).unwrap();
+    let headers = reader.headers().unwrap();
+    assert_eq!(headers, expected);
+}
+
 // ── Smoke tests ───────────────────────────────────────────────────────────────
 
 #[test]
@@ -22,11 +29,11 @@ fn smoke_terminal() {
 }
 
 #[test]
-fn smoke_csv_output() {
+#[rustfmt::skip]
+fn csv_output_headers() {
     let tmp = TempDir::new().unwrap();
     // -o is the exact report directory; it must not exist yet.
     let report_dir = tmp.path().join("report");
-    #[rustfmt::skip]
     dolos_run(
         &[SAMPLE1, SAMPLE2],
         &[
@@ -38,11 +45,22 @@ fn smoke_csv_output() {
     .assert()
     .success();
 
-    // Files are written directly into the given directory, no subfolder.
-    assert!(report_dir.join("pairs.csv").exists());
-    assert!(report_dir.join("metadata.csv").exists());
-    assert!(report_dir.join("files.csv").exists());
-    assert!(report_dir.join("fragments.csv").exists());
+    assert_csv_headers(
+        &report_dir.join("pairs.csv"),
+        &["file1_id","file1_path","file2_id","file2_path","similarity","longest","totalLeft","totalRight","overlapLeft","overlapRight"],
+    );
+    assert_csv_headers(
+        &report_dir.join("metadata.csv"),
+        &["property","value"]
+    );
+    assert_csv_headers(
+        &report_dir.join("files.csv"),
+        &["id","path","content","fingerprints","fingerprint_regions"]
+    );
+    assert_csv_headers(
+        &report_dir.join("fragments.csv"),
+        &["file1_id","file1_path","file1_start_point","file1_end_point","file2_id","file2_path","file2_start_point","file2_end_point","fingerprint_count","ignored"],
+    );
 }
 
 #[test]
@@ -74,6 +92,8 @@ fn csv_output_default_destination() {
     assert!(report_dir.join("fragments.csv").exists());
 }
 
+// ── Error surfacing ───────────────────────────────────────────────────────────
+
 #[test]
 fn csv_output_errors_when_directory_exists() {
     let tmp = TempDir::new().unwrap();
@@ -86,8 +106,6 @@ fn csv_output_errors_when_directory_exists() {
     .failure()
     .stderr(predicate::str::contains("already exists"));
 }
-
-// ── Error surfacing ───────────────────────────────────────────────────────────
 
 #[test]
 fn test_errors_reach_process() {

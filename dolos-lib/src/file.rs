@@ -1,3 +1,5 @@
+use crate::winnowing::fingerprints::Fingerprint;
+use crate::winnowing::region::Region;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
@@ -9,6 +11,18 @@ pub struct File {
     pub relative_path: PathBuf,
     /// Full source text of the file.
     pub content: String,
+    /// The file's winnowed fingerprint sequence and source regions, if `include_analysis_data` is set.
+    pub core_data: Option<CoreData>,
+}
+
+/// A file's winnowing output, exported so that a pair's fragments can be
+/// recomputed from the report alone.
+#[derive(Debug, Clone)]
+pub struct CoreData {
+    /// The file's winnowed fingerprint sequence.
+    pub fingerprints: Vec<Fingerprint>,
+    /// The source region of each fingerprint (same length as `fingerprints`).
+    pub regions: Vec<Region>,
 }
 
 impl Hash for File {

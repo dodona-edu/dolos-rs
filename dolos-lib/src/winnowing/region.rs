@@ -1,9 +1,7 @@
-#[cfg(test)]
 use serde::{Deserialize, Serialize};
 use tree_sitter;
 
-#[cfg_attr(test, derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Point {
     pub row: usize,
     pub column: usize,
@@ -23,8 +21,7 @@ impl From<tree_sitter::Point> for Point {
 
 /// A range of positions in a multi-line text document, both in terms of bytes
 /// and of rows and columns.
-#[cfg_attr(test, derive(Serialize, Deserialize))]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Region {
     pub start_point: Point, // inclusive
     pub end_point: Point,   // exclusive

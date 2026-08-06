@@ -127,6 +127,15 @@ pub struct DolosArgs {
     pub min_length_match: usize,
 
     #[arg(
+        long,
+        default_value = "false",
+        long_help = "Include each file's fingerprints and their source locations in the report. \
+                     This data is required to rerun only the analysis with dolos-core, \
+                     without parsing and fingerprinting the source files again."
+    )]
+    pub include_analysis_data: bool,
+
+    #[arg(
         value_enum,
         long,
         long_help = "Sort pairs by: similarity, total-overlap, or longest-fragment."
@@ -151,6 +160,7 @@ impl TryFrom<DolosArgs> for DolosConfig {
             .kgrams_in_window(a.kgrams_in_window)
             .include_comments(a.include_comments)
             .compare(a.compare)
+            .include_analysis_data(a.include_analysis_data)
             .min_length_match(a.min_length_match);
 
         if let Some(v) = a.name {
@@ -285,6 +295,7 @@ mod tests {
         assert_eq!(cfg.min_length_match, 1);
         assert!(!cfg.include_comments);
         assert!(!cfg.compare);
+        assert!(!cfg.include_analysis_data);
         assert!(cfg.max_fingerprint_count.is_none());
         assert!(cfg.max_fingerprint_percentage.is_none());
         assert!(cfg.language.is_none());
@@ -307,6 +318,7 @@ mod tests {
             "-b", "kgrams-ascending",
             "-C",
             "-c",
+            "--include-analysis-data",
         ])
         .unwrap();
 
@@ -317,6 +329,7 @@ mod tests {
         assert_eq!(cfg.max_fingerprint_percentage, Some(0.9));
         assert!(cfg.include_comments);
         assert!(cfg.compare);
+        assert!(cfg.include_analysis_data);
         assert_eq!(cfg.name, Some("custom".to_string()));
         assert!(cfg.language.is_some());
         assert!(cfg.sort_by.is_some());

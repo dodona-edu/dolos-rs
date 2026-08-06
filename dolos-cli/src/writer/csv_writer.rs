@@ -2,13 +2,20 @@ use crate::writer::output::OutputWriter;
 use dolos::File as SourceFile;
 use dolos::Metadata;
 use dolos::Pair;
+use dolos::Report;
 use std::fs::File;
 use std::io::{Error, ErrorKind, Result};
 use std::path::PathBuf;
 use std::rc::Rc;
 
 const METADATA_HEADER: &[&str] = &["property", "value"];
-const FILES_HEADER: &[&str] = &["id", "path", "content"];
+const FILES_HEADER: &[&str] = &[
+    "id",
+    "path",
+    "content",
+    "fingerprints",
+    "fingerprint_regions",
+];
 const FRAGMENTS_HEADER: &[&str] = &[
     "file1_id",
     "file1_path",
@@ -36,7 +43,7 @@ const PAIRS_HEADER: &[&str] = &[
 
 /// CSV writer that outputs similarity results to a CSV file.
 pub struct CsvWriter {
-    similarities_writer: csv::Writer<File>,
+    pairs_writer: csv::Writer<File>,
     /// Present only when `include_fragments` is set; streams rows into `fragments.csv`.
     fragments_writer: Option<csv::Writer<File>>,
 }
@@ -50,11 +57,8 @@ impl CsvWriter {
     /// not yet exist. Writes `metadata.csv` and `files.csv` in one shot
     /// each, and opens a streamed `pairs.csv` (and optionally `fragments.csv`
     /// when `metadata.include_fragments` is set) for the pair rows.
-    pub(super) fn new(
-        output_destination: Option<PathBuf>,
-        metadata: &Metadata,
-        files: &[Rc<SourceFile>],
-    ) -> Result<Self> {
+    pub(super) fn new(output_destination: Option<PathBuf>, report: &Report) -> Result<Self> {
+        let metadata = &report.metadata;
         let report_dir =
             output_destination.unwrap_or_else(|| PathBuf::from(report_dir_name(metadata)));
         if report_dir.exists() {
@@ -69,15 +73,15 @@ impl CsvWriter {
         std::fs::create_dir_all(&report_dir)?;
 
         // metadata.csv — fully known up front, written in one shot.
-        let mut meta =
+        let mut metadata_writer =
             csv::Writer::from_path(report_dir.join("metadata.csv")).map_err(Error::other)?;
-        write_metadata(&mut meta, metadata)?;
-        meta.flush().map_err(Error::other)?;
+        write_metadata(&mut metadata_writer, metadata)?;
+        metadata_writer.flush().map_err(Error::other)?;
 
         // files.csv — fully known up front, written in one shot.
         let mut files_writer =
             csv::Writer::from_path(report_dir.join("files.csv")).map_err(Error::other)?;
-        write_files(&mut files_writer, files)?;
+        write_files(&mut files_writer, &report.files)?;
         files_writer.flush().map_err(Error::other)?;
 
         // fragments.csv — streamed per pair via write_pair; omitted when fragments are not stored.
@@ -91,20 +95,20 @@ impl CsvWriter {
         };
 
         // pairs.csv — streamed per pair via write_pair.
-        let mut similarities_writer =
+        let mut pairs_writer =
             csv::Writer::from_path(report_dir.join("pairs.csv")).map_err(Error::other)?;
-        similarities_writer
+        pairs_writer
             .write_record(PAIRS_HEADER)
             .map_err(Error::other)?;
 
-        Ok(Self { similarities_writer, fragments_writer })
+        Ok(Self { pairs_writer, fragments_writer })
     }
 }
 
 impl OutputWriter for CsvWriter {
     fn write_pair(&mut self, pair: &Pair) -> Result<()> {
         let m = &pair.metrics;
-        self.similarities_writer
+        self.pairs_writer
             .serialize((
                 pair.left_file.id.to_string(),
                 pair.left_file.relative_path.display().to_string(),
@@ -145,7 +149,7 @@ impl OutputWriter for CsvWriter {
     }
 
     fn finish(mut self) -> Result<()> {
-        self.similarities_writer.flush().map_err(Error::other)?;
+        self.pairs_writer.flush().map_err(Error::other)?;
         if let Some(mut w) = self.fragments_writer {
             w.flush().map_err(Error::other)?;
         }
@@ -161,7 +165,7 @@ fn report_dir_name(metadata: &Metadata) -> String {
     )
 }
 
-/// Sanitize a report name for use in a directory name: spaces become dashes and
+/// Sanitize a name for use in a directory name: spaces become dashes and
 /// any character that is not ASCII alphanumeric or `-` is dropped.
 fn sanitize_name(name: &str) -> String {
     name.chars()
@@ -188,14 +192,31 @@ fn write_files(
     files: &[Rc<SourceFile>],
 ) -> Result<()> {
     writer.write_record(FILES_HEADER).map_err(Error::other)?;
+
+    // Fields are streamed with `write_field` so the (potentially large) file
+    // content is written by reference instead of cloned.
     for file in files {
         writer
-            .write_record([
-                file.id.to_string(),
-                file.relative_path.display().to_string(),
-                file.content.clone(),
-            ])
+            .write_field(file.id.to_string())
             .map_err(Error::other)?;
+        writer
+            .write_field(file.relative_path.display().to_string())
+            .map_err(Error::other)?;
+        writer.write_field(&file.content).map_err(Error::other)?;
+
+        let (fingerprints, regions) = match &file.core_data {
+            Some(core_data) => (
+                serde_json::to_string(&core_data.fingerprints).expect("fingerprints serialize"),
+                serde_json::to_string(&core_data.regions).expect("regions serialize"),
+            ),
+            None => (String::new(), String::new()),
+        };
+        writer.write_field(fingerprints).map_err(Error::other)?;
+        writer.write_field(regions).map_err(Error::other)?;
+
+        // Terminate the record (csv requires an explicit empty record after
+        // a sequence of `write_field` calls).
+        writer.write_record(None::<&[u8]>).map_err(Error::other)?;
     }
     Ok(())
 }
