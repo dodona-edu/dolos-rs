@@ -1,10 +1,11 @@
+use crate::Symbol;
 use crate::suffixtree::match_collector::MatchCollector;
 use crate::suffixtree::node::Node;
 use crate::suffixtree::tree::SuffixTree;
-use crate::suffixtree::types::{AnalysisResult, SENTINEL_SYMBOL, StartPosition, SymbolType};
+use crate::suffixtree::types::{AnalysisResult, SENTINEL_SYMBOL, StartPosition};
 use std::collections::{HashMap, HashSet};
 
-type LeftMap = HashMap<SymbolType, Vec<StartPosition>>;
+type LeftMap = HashMap<Symbol, Vec<StartPosition>>;
 
 /// Analyzer for finding maximal exact matches in a generalized suffix tree.
 ///
@@ -17,48 +18,40 @@ pub struct MaximalMatchAnalyzer<'a> {
     /// The generalized suffix tree built from all sequences.
     tree: &'a mut SuffixTree,
     /// The original sequences, without explicit end-of-sequence sentinels.
-    sequences: &'a [Vec<SymbolType>],
-    /// Only matches of at least this many tokens are considered.
+    sequences: &'a [Vec<Symbol>],
+    /// Only matches of at least this many symbols are considered.
     min_match_length: usize,
-    /// Whether to keep fragments of all the similar matches.
-    pub keep_fragments: bool,
-    /// Whether fingerprints marked as ignored (via [`SuffixTree::add_ignored_sequences`]
-    /// or the `max_file_count` cap) are omitted from similarity calculations.
+    /// Whether to keep the raw matches in the result.
+    keep_matches: bool,
+    /// Whether symbols marked as ignored (via [`SuffixTree::add_ignored_sequences`]
+    /// or the `max_seq_count` cap) are omitted from similarity calculations.
     exclude_ignored: bool,
-    /// Maximum number of distinct files a shared substring may appear in
-    /// before it is suppressed as a too-common boilerplate.
+    /// Maximum number of distinct sequences a shared substring may appear in
+    /// before it is suppressed as too-common boilerplate.
     ///
     /// `None` means no cap is applied.
-    max_file_count: Option<usize>,
+    max_seq_count: Option<usize>,
 }
 
 impl<'a> MaximalMatchAnalyzer<'a> {
-    /// Create a new [`MaximalMatchAnalyzer`].
-    ///
-    /// # Arguments
-    /// * `tree` – Generalized suffix tree built from all `sequences`.
-    /// * `sequences` – The sequences to analyze (regular files only; ignored content is
-    ///   already encoded in `node.ignore` flags on the tree).
-    /// * `min_match_length` – Minimum number of tokens a shared substring must
-    ///   have to be counted as a match.
-    /// * `keep_fragments` – Whether to store raw matches for fragment resolution.
-    /// * `max_file_count` – Suppress any shared substring that appears in more
-    ///   than these many distinct files. `None` disables the cap.
+    /// Create a new [`MaximalMatchAnalyzer`]; see the field docs for the
+    /// meaning of each parameter. Ignored content (templates) is already
+    /// encoded in `node.ignore` flags on the tree.
     pub fn new(
         tree: &'a mut SuffixTree,
-        sequences: &'a [Vec<SymbolType>],
+        sequences: &'a [Vec<Symbol>],
         min_match_length: usize,
-        keep_fragments: bool,
+        keep_matches: bool,
         exclude_ignored: bool,
-        max_file_count: Option<usize>,
+        max_seq_count: Option<usize>,
     ) -> Self {
         Self {
             tree,
             sequences,
             min_match_length,
-            keep_fragments,
+            keep_matches,
             exclude_ignored,
-            max_file_count,
+            max_seq_count,
         }
     }
 
@@ -69,20 +62,16 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     /// [`AnalysisResult`] containing per-pair similarity scores and longest
     /// fragment lengths.
     ///
-    /// Matches are excluded in three cases:
-    /// - If the length of the match does not meet `min_match_length`,
-    ///   it is suppressed.
-    /// - The shared substring is present in an ignored file: nodes marked
-    ///   `ignore` (set via [`SuffixTree::add_ignored_sequences`]) are skipped
-    ///   entirely, suppressing all matches rooted at that node.
-    /// - The shared substring appears in more than `max_file_count` distinct
-    ///   files: it is treated as a common boilerplate and not recorded.
+    /// Matches shorter than `min_match_length` are suppressed. Matches whose
+    /// shared substring occurs in an ignored sequence (nodes marked `ignore`)
+    /// or in more than `max_seq_count` distinct sequences are recorded but
+    /// flagged as ignored.
     pub fn analyze(&mut self) -> AnalysisResult {
-        if self.max_file_count.is_some() {
+        if self.max_seq_count.is_some() {
             self.propagate_sequence_indices(0);
         }
         let mut collector =
-            MatchCollector::new(self.sequences, self.keep_fragments, self.exclude_ignored);
+            MatchCollector::new(self.sequences, self.keep_matches, self.exclude_ignored);
         self.find_maximal_pairs(0, 0, &mut collector);
         collector.into_result()
     }
@@ -92,14 +81,14 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     /// Two conditions can trigger this:
     /// - The node was explicitly marked via [`SuffixTree::add_ignored_sequences`] and
     ///   `exclude_ignored` is enabled.
-    /// - The number of distinct files the shared substring appears in exceeds
-    ///   `max_file_count` (boilerplate filter).
+    /// - The number of distinct sequences the shared substring appears in
+    ///   exceeds `max_seq_count` (boilerplate filter).
     fn is_node_ignored(&self, node_index: usize) -> bool {
         let node = self.substring_node(node_index);
         if self.exclude_ignored && node.ignore {
             return true;
         }
-        if let Some(max_count) = self.max_file_count {
+        if let Some(max_count) = self.max_seq_count {
             let file_count = node.sequence_indices.as_ref().map_or(0, |si| si.len());
             if file_count > max_count {
                 return true;
@@ -326,16 +315,15 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     ///   sentinel (two suffixes both starting at position 0 in different sequences
     ///   should still be paired).
     #[inline]
-    fn should_process_pair(left_symbol: SymbolType, other_left_symbol: SymbolType) -> bool {
+    fn should_process_pair(left_symbol: Symbol, other_left_symbol: Symbol) -> bool {
         other_left_symbol != left_symbol || left_symbol == SENTINEL_SYMBOL
     }
 
     /// Record a match for every cross-sequence pair between `positions1` and `positions2`.
     ///
-    /// Positions that belong to the *same* sequence are skipped — a suffix can only
-    /// form a meaningful plagiarism signal when it appears in two *different*
-    /// source files. For each valid cross-sequence pair the current string `depth`
-    /// is used as the match length.
+    /// Positions that belong to the *same* sequence are skipped — only matches
+    /// between two *different* sequences are meaningful. For each valid
+    /// cross-sequence pair the current string `depth` is used as the match length.
     fn process_position_pairs(
         &self,
         positions1: &[StartPosition],
