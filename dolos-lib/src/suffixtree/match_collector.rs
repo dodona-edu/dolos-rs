@@ -88,8 +88,8 @@ impl<'a> MatchCollector<'a> {
             for i2 in (i1 + 1)..self.sequences.len() {
                 let total_left = self.sequences[i1].len();
                 let total_right = self.sequences[i2].len();
-                let overlap_left = self.overlap_bitmap.count_ones(i1, i2, i1);
-                let overlap_right = self.overlap_bitmap.count_ones(i1, i2, i2);
+                let overlap_left = self.overlap_bitmap.side(i1, i2, i1).count_ones();
+                let overlap_right = self.overlap_bitmap.side(i1, i2, i2).count_ones();
 
                 let total_overlap = overlap_left + overlap_right;
                 let total_length = total_left + total_right;
