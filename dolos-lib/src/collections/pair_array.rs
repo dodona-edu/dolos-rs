@@ -15,14 +15,13 @@ impl<T: Clone> PairArray<T> {
     /// matched. For `n` elements there are `n * (n - 1) / 2` unique unordered pairs
     /// stored.
     pub fn new(size: usize, default: T) -> Self {
-        let data_size = size * (size - 1) / 2;
-        Self { data: vec![default; data_size], size }
+        Self { data: vec![default; pair_count(size)], size }
     }
 
     /// Creates a `PairArray` from a pre-initialized vector.
     /// The vector must have exactly `size * (size - 1) / 2` elements.
     pub fn from_vec(data: Vec<T>, size: usize) -> Self {
-        debug_assert_eq!(data.len(), size * (size - 1) / 2, "Data size mismatch");
+        debug_assert_eq!(data.len(), pair_count(size), "Data size mismatch");
         Self { data, size }
     }
 
@@ -60,15 +59,69 @@ impl<T: Clone> PairArray<T> {
         self.size
     }
 
+    /// Returns the number of stored pairs.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+
+    /// Returns whether no pair is stored, which is the case for fewer than two
+    /// elements.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.data.is_empty()
+    }
+
     /// Returns an iterator over all pairs with their indices.
     pub fn iter_pairs(&self) -> impl Iterator<Item = (usize, usize, &T)> {
-        (0..self.size).flat_map(move |i| ((i + 1)..self.size).map(move |j| (i, j, self.get(i, j))))
+        pair_indices(self.size)
+            .zip(self.data.iter())
+            .map(|((i1, i2), value)| (i1, i2, value))
     }
+
+    /// Returns an iterator over all pairs with their indices, allowing the
+    /// values to be modified.
+    pub fn iter_pairs_mut(&mut self) -> impl Iterator<Item = (usize, usize, &mut T)> {
+        pair_indices(self.size)
+            .zip(self.data.iter_mut())
+            .map(|((i1, i2), value)| (i1, i2, value))
+    }
+}
+
+/// The number of unordered pairs among `size` elements.
+#[inline]
+fn pair_count(size: usize) -> usize {
+    size * size.saturating_sub(1) / 2
+}
+
+/// The pair indices in storage order: (0,1), (0,2), ..., (1,2), ...
+fn pair_indices(size: usize) -> impl Iterator<Item = (usize, usize)> {
+    (0..size).flat_map(move |i1| ((i1 + 1)..size).map(move |i2| (i1, i2)))
 }
 
 #[cfg(test)]
 mod tests {
     use crate::collections::pair_array::PairArray;
+
+    #[test]
+    fn fewer_than_two_elements_store_no_pair() {
+        let arr: PairArray<usize> = PairArray::new(0, 0);
+        assert!(arr.is_empty());
+        assert_eq!(PairArray::new(1, 0).len(), 0);
+    }
+
+    #[test]
+    fn iter_pairs_mut_visits_every_pair_in_storage_order() {
+        let mut arr = PairArray::new(3, 0);
+        for (i1, i2, value) in arr.iter_pairs_mut() {
+            *value = 10 * i1 + i2;
+        }
+
+        assert_eq!(
+            arr.iter_pairs().map(|(_, _, &v)| v).collect::<Vec<_>>(),
+            [1, 2, 12]
+        );
+    }
 
     #[test]
     fn test_pair_array() {

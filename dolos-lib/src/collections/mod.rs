@@ -1,6 +1,7 @@
 //! Self-contained data structures used for the analysis.
 #![allow(dead_code)]
 
+pub mod bit_region;
 mod bit_vec;
 pub mod pair_array;
 pub mod pair_bitmap;
