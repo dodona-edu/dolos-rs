@@ -86,7 +86,8 @@ impl<'a> MatchCollector<'a> {
         self.ignore_bitmap
             .as_mut()
             .expect("ignore tracking not enabled")
-            .mark(sp.sequence_index, sp.start, length);
+            .item_mut(sp.sequence_index)
+            .mark(sp.start, length);
     }
 
     /// Update the longest fragment for a pair if the new length exceeds the current maximum.
@@ -110,17 +111,19 @@ impl<'a> MatchCollector<'a> {
     fn pair_coverage(&self, i1: usize, i2: usize) -> (usize, usize, usize, usize) {
         if let Some(ignore) = &self.ignore_bitmap {
             (
-                self.sequences[i1].len() - ignore.count_ones(i1),
-                self.sequences[i2].len() - ignore.count_ones(i2),
-                (self.overlap_bitmap.words_for(i1, i2, i1) & !ignore.words_for(i1)).count_ones(),
-                (self.overlap_bitmap.words_for(i1, i2, i2) & !ignore.words_for(i2)).count_ones(),
+                self.sequences[i1].len() - ignore.item(i1).count_ones(),
+                self.sequences[i2].len() - ignore.item(i2).count_ones(),
+                (self.overlap_bitmap.side(i1, i2, i1).words() & !ignore.item(i1).words())
+                    .count_ones(),
+                (self.overlap_bitmap.side(i1, i2, i2).words() & !ignore.item(i2).words())
+                    .count_ones(),
             )
         } else {
             (
                 self.sequences[i1].len(),
                 self.sequences[i2].len(),
-                self.overlap_bitmap.count_ones(i1, i2, i1),
-                self.overlap_bitmap.count_ones(i1, i2, i2),
+                self.overlap_bitmap.side(i1, i2, i1).count_ones(),
+                self.overlap_bitmap.side(i1, i2, i2).count_ones(),
             )
         }
     }
