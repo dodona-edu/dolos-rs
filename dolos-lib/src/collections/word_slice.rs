@@ -1,10 +1,11 @@
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 
 /// A borrowed view over packed `u64` words.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct WordSlice<'a>(&'a [u64]);
 
 /// Owned result of a bit operation.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OwnedWords(Vec<u64>);
 
 // ── Public API ────────────────────────────────────────────────────────────────
@@ -14,12 +15,34 @@ impl<'a> WordSlice<'a> {
         Self(words)
     }
 
+    /// The number of words.
+    pub fn len(self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether there is no word at all.
+    pub fn is_empty(self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The number of set bits over all words.
     pub fn count_ones(self) -> usize {
         self.0.iter().map(|&w| w.count_ones() as usize).sum()
     }
 }
 
 impl OwnedWords {
+    /// The number of words.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Whether there is no word at all.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// The number of set bits over all words.
     pub fn count_ones(&self) -> usize {
         self.0.iter().map(|&w| w.count_ones() as usize).sum()
     }
