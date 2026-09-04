@@ -21,6 +21,16 @@ pub struct StartPosition {
     pub start: usize,
 }
 
+impl StartPosition {
+    /// The same position moved `delta` fingerprints forward.
+    pub fn shifted(&self, delta: usize) -> Self {
+        Self {
+            sequence_index: self.sequence_index,
+            start: self.start + delta,
+        }
+    }
+}
+
 /// A maximal exact match between two positions in (possibly different) sequences.
 ///
 /// `left_start` and `right_start` are offsets into the fingerprint arrays of

@@ -1,3 +1,4 @@
+use crate::ignore::IgnoredFingerprints;
 use crate::suffixtree::maximal_match::MaximalMatchAnalyzer;
 use crate::suffixtree::node::Node;
 use crate::suffixtree::tree_builder::UkkonenBuilder;
@@ -23,15 +24,19 @@ impl SuffixTree {
     /// similarity and longest-fragment results.
     ///
     /// * `sequences` — fingerprint sequences for the files being analyzed.
+    /// * `ignored` — which fingerprint positions are ignored; matches are split
+    ///   at those positions before being recorded.
     /// * `min_match_length` — minimum shared substring length to record as a match.
     /// * `keep_fragments` — when `true`, raw matches are retained for fragment resolution.
     pub fn analyze(
         &self,
         sequences: &[Vec<SymbolType>],
+        ignored: &IgnoredFingerprints,
         min_match_length: usize,
         keep_fragments: bool,
     ) -> AnalysisResult {
-        MaximalMatchAnalyzer::new(self, sequences, min_match_length, keep_fragments).analyze()
+        MaximalMatchAnalyzer::new(self, sequences, ignored, min_match_length, keep_fragments)
+            .analyze()
     }
 }
 
@@ -278,13 +283,72 @@ mod tests_build_multiple_sequences {
 
 #[cfg(test)]
 mod tests_analysis {
+    use crate::ignore::IgnoredFingerprints;
     use crate::suffixtree::tree::SuffixTree;
     use crate::suffixtree::tree::suffixtree_test_utils::str_to_nodes;
     use crate::suffixtree::types::{AnalysisResult, SymbolType};
+    use std::ops::Range;
 
     fn analyze(sequences: &[Vec<SymbolType>], min_match_length: usize) -> AnalysisResult {
+        analyze_ignoring(sequences, &[], None, min_match_length).0
+    }
+
+    /// Analyze with an ignore configuration, keeping the raw matches so that the
+    /// tests can check every recorded position against the mask.
+    ///
+    /// Asserts on the way out that no recorded match covers an ignored position.
+    fn analyze_ignoring(
+        sequences: &[Vec<SymbolType>],
+        boilerplate: &[Vec<SymbolType>],
+        max_file_count: Option<usize>,
+        min_match_length: usize,
+    ) -> (AnalysisResult, IgnoredFingerprints) {
+        let ignored = crate::ignore::classify(sequences, boilerplate, max_file_count);
         let tree = SuffixTree::build(sequences);
-        tree.analyze(sequences, min_match_length, false)
+        let result = tree.analyze(sequences, &ignored, min_match_length, true);
+        assert_no_recorded_match_is_ignored(&result, &ignored);
+        (result, ignored)
+    }
+
+    /// Assert that no stored match covers an ignored fingerprint.
+    ///
+    /// A match is ignore-free exactly when it is one single usable run.
+    fn assert_no_recorded_match_is_ignored(result: &AnalysisResult, ignored: &IgnoredFingerprints) {
+        let matches = result.matches.as_ref().expect("fragments are kept");
+        for (left, right, pair_matches) in matches.iter_pairs() {
+            for m in pair_matches {
+                assert!(m.length > 0, "a zero-length match must never be stored");
+                for (file, start) in [(left, m.left_start), (right, m.right_start)] {
+                    let runs: Vec<Range<usize>> =
+                        ignored.usable_runs(file, start..start + m.length).collect();
+                    assert_eq!(
+                        runs,
+                        vec![start..start + m.length],
+                        "match {m:?} covers an ignored position of file {file}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// The usable runs of `file` over its whole length.
+    fn usable_runs(ignored: &IgnoredFingerprints, file: usize, length: usize) -> Vec<Range<usize>> {
+        ignored.usable_runs(file, 0..length).collect()
+    }
+
+    /// The stored matches of one pair as `(left_start, right_start, length)`,
+    /// sorted so the assertions do not depend on traversal order.
+    fn pair_matches(result: &AnalysisResult, i: usize, j: usize) -> Vec<(usize, usize, usize)> {
+        let mut found: Vec<(usize, usize, usize)> = result
+            .matches
+            .as_ref()
+            .expect("fragments are kept")
+            .get(i, j)
+            .iter()
+            .map(|m| (m.left_start, m.right_start, m.length))
+            .collect();
+        found.sort_unstable();
+        found
     }
 
     #[test]
@@ -355,5 +419,122 @@ mod tests_analysis {
         // "ABC" has length 3, which is below min_match_length 5 → not counted
         let sequences = vec![str_to_nodes("ABCDEF"), str_to_nodes("XYZABC")];
         assert_eq!(analyze(&sequences, 5).metrics.get(0, 1).longest_fragment, 0);
+    }
+
+    // ── Ignoring ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_ignored_value_in_the_middle_splits_the_match() {
+        // The single raw match "AXB"/"AXB" (length 3 at 0,0) is cut in two by
+        // the ignored X at position 1.
+        let sequences = vec![str_to_nodes("AXB"), str_to_nodes("AXB")];
+        let (result, ignored) = analyze_ignoring(&sequences, &[str_to_nodes("X")], None, 1);
+
+        assert_eq!(usable_runs(&ignored, 0, 3), vec![0..1, 2..3]);
+        assert_eq!(pair_matches(&result, 0, 1), vec![(0, 0, 1), (2, 2, 1)]);
+
+        let m = result.metrics.get(0, 1);
+        assert_eq!(m.longest_fragment, 1);
+        assert_eq!((m.overlap_left, m.overlap_right), (2, 2));
+        assert_eq!((m.total_left, m.total_right), (2, 2));
+        assert_eq!(m.similarity, 1.0);
+    }
+
+    #[test]
+    fn test_ignored_suffix_truncates_the_match() {
+        // C and D are ignored, so the length-4 match keeps only its "AB" prefix.
+        let sequences = vec![str_to_nodes("ABCD"), str_to_nodes("ABCD")];
+        let (result, ignored) = analyze_ignoring(&sequences, &[str_to_nodes("CD")], None, 1);
+
+        assert_eq!(usable_runs(&ignored, 0, 4), vec![0..2]);
+        assert_eq!(pair_matches(&result, 0, 1), vec![(0, 0, 2)]);
+
+        let m = result.metrics.get(0, 1);
+        assert_eq!(m.longest_fragment, 2);
+        assert_eq!((m.overlap_left, m.overlap_right), (2, 2));
+        assert_eq!((m.total_left, m.total_right), (2, 2));
+        assert_eq!(m.similarity, 1.0);
+    }
+
+    #[test]
+    fn test_core_without_a_node_of_its_own_is_recovered() {
+        // The two "BBC" suffixes meet at one leaf at depth 3, so the tree has
+        // no node for "BB"; only splitting the depth-4 match recovers it.
+        let sequences = vec![str_to_nodes("ABBC"), str_to_nodes("ABBC")];
+        let (result, ignored) =
+            analyze_ignoring(&sequences, &[str_to_nodes("A"), str_to_nodes("C")], None, 1);
+
+        assert_eq!(usable_runs(&ignored, 0, 4), vec![1..3]);
+        // The length-2 core, plus the two single-B matches that the tree finds
+        // at the "B" node (left symbols A and B differ, so they are maximal).
+        assert_eq!(
+            pair_matches(&result, 0, 1),
+            vec![(1, 1, 2), (1, 2, 1), (2, 1, 1)]
+        );
+
+        let m = result.metrics.get(0, 1);
+        assert_eq!(m.longest_fragment, 2);
+        assert_eq!((m.overlap_left, m.overlap_right), (2, 2));
+        assert_eq!((m.total_left, m.total_right), (2, 2));
+        assert_eq!(m.similarity, 1.0);
+    }
+
+    #[test]
+    fn test_min_match_length_applies_per_run() {
+        // Five fingerprints match, but the ignored X leaves two runs of two.
+        let sequences = vec![str_to_nodes("ABXBC"), str_to_nodes("ABXBC")];
+        let (result, _) = analyze_ignoring(&sequences, &[str_to_nodes("X")], None, 3);
+
+        assert!(pair_matches(&result, 0, 1).is_empty());
+
+        let m = result.metrics.get(0, 1);
+        assert_eq!(m.longest_fragment, 0);
+        assert_eq!((m.overlap_left, m.overlap_right), (0, 0));
+        assert_eq!((m.total_left, m.total_right), (4, 4));
+        assert_eq!(m.similarity, 0.0);
+    }
+
+    #[test]
+    fn test_fully_ignored_files_have_no_similarity() {
+        // Both denominators collapse to zero.
+        let sequences = vec![str_to_nodes("XX"), str_to_nodes("X")];
+        let (result, ignored) = analyze_ignoring(&sequences, &[str_to_nodes("X")], None, 1);
+
+        assert_eq!(ignored.effective_length(0), 0);
+        assert_eq!(ignored.effective_length(1), 0);
+        assert!(pair_matches(&result, 0, 1).is_empty());
+
+        let m = result.metrics.get(0, 1);
+        assert_eq!((m.total_left, m.total_right), (0, 0));
+        assert_eq!((m.overlap_left, m.overlap_right), (0, 0));
+        assert_eq!(m.similarity, 0.0);
+    }
+
+    #[test]
+    fn test_frequency_cap_decides_per_corpus() {
+        // X occurs in two of three files: at a cap of 2 it is still usable, so
+        // all three of file 0's X's match file 1's single X.
+        let sequences = vec![str_to_nodes("XXXA"), str_to_nodes("XB"), str_to_nodes("C")];
+        let (result, ignored) = analyze_ignoring(&sequences, &[], Some(2), 1);
+
+        assert_eq!(usable_runs(&ignored, 0, 4), vec![0..4]);
+        let m = result.metrics.get(0, 1);
+        assert_eq!(m.longest_fragment, 1);
+        assert_eq!((m.overlap_left, m.overlap_right), (3, 1));
+        assert_eq!((m.total_left, m.total_right), (4, 2));
+        assert_eq!(m.similarity, 4.0 / 6.0);
+
+        // Adding X to the third file pushes it over the cap; the same pair now
+        // shares nothing, and only the non-X fingerprints remain in the totals.
+        let sequences = vec![str_to_nodes("XXXA"), str_to_nodes("XB"), str_to_nodes("CX")];
+        let (result, ignored) = analyze_ignoring(&sequences, &[], Some(2), 1);
+
+        assert_eq!(usable_runs(&ignored, 0, 4), vec![3..4]);
+        assert!(pair_matches(&result, 0, 1).is_empty());
+        let m = result.metrics.get(0, 1);
+        assert_eq!(m.longest_fragment, 0);
+        assert_eq!((m.overlap_left, m.overlap_right), (0, 0));
+        assert_eq!((m.total_left, m.total_right), (1, 1));
+        assert_eq!(m.similarity, 0.0);
     }
 }
