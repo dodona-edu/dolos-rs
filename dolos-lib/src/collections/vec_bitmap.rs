@@ -12,26 +12,30 @@ pub struct VecBitmap {
     buf: BitVec,
     /// Bit length of each item.
     lengths: Vec<usize>,
-    /// `offsets[k]` = word index in `buf` at which item `k`'s bit-vector begins.
-    offsets: Vec<usize>,
+    /// `word_bases[k]` = word index in `buf` at which item `k`'s bit-vector begins.
+    word_bases: Vec<usize>,
 }
 
 impl VecBitmap {
     /// Create a new [`VecBitmap`] for items whose bit lengths are given by
     /// `lengths`. All bits are initialized to zero.
     pub fn new(lengths: &[usize]) -> Self {
-        let mut offsets = vec![0usize; lengths.len()];
+        let mut word_bases = vec![0usize; lengths.len()];
         let mut total = 0;
-        for (index, &length) in lengths.iter().enumerate() {
-            offsets[index] = total;
+        for (item, &length) in lengths.iter().enumerate() {
+            word_bases[item] = total;
             total += length.div_ceil(64);
         }
 
-        Self { buf: BitVec::new(total), lengths: lengths.to_vec(), offsets }
+        Self {
+            buf: BitVec::new(total),
+            lengths: lengths.to_vec(),
+            word_bases,
+        }
     }
 
     /// The number of items.
-    pub fn items(&self) -> usize {
+    pub fn item_count(&self) -> usize {
         self.lengths.len()
     }
 
@@ -40,15 +44,15 @@ impl VecBitmap {
         self.lengths.is_empty()
     }
 
-    /// The bit-vector of item `index`.
-    pub fn item(&self, index: usize) -> BitRegion<'_> {
-        self.buf.region(self.offsets[index], self.lengths[index])
+    /// The bit-vector of the given item.
+    pub fn item(&self, item: usize) -> BitRegion<'_> {
+        self.buf.region(self.word_bases[item], self.lengths[item])
     }
 
-    /// The bit-vector of item `index`, for writing.
-    pub fn item_mut(&mut self, index: usize) -> BitRegionMut<'_> {
+    /// The bit-vector of the given item, for writing.
+    pub fn item_mut(&mut self, item: usize) -> BitRegionMut<'_> {
         self.buf
-            .region_mut(self.offsets[index], self.lengths[index])
+            .region_mut(self.word_bases[item], self.lengths[item])
     }
 }
 
@@ -59,7 +63,7 @@ mod tests {
     #[test]
     fn items_are_independent() {
         let mut bm = VecBitmap::new(&[10, 10]);
-        assert_eq!(bm.items(), 2);
+        assert_eq!(bm.item_count(), 2);
         assert_eq!(bm.item(0).count_ones(), 0);
 
         bm.item_mut(0).mark(0, 5);
@@ -97,8 +101,8 @@ mod tests {
         bm.item_mut(0).mark(0, 100);
         bm.item_mut(2).mark(0, 100);
 
-        assert_eq!(bm.item(1).next_set_bit(0, 100), None);
-        assert_eq!(bm.item(1).next_clear_bit(0, 100), Some(0));
-        assert_eq!(bm.item(2).next_set_bit(0, 100), Some(0));
+        assert_eq!(bm.item(1).next_one_bit(0, 100), None);
+        assert_eq!(bm.item(1).next_zero_bit(0, 100), Some(0));
+        assert_eq!(bm.item(2).next_one_bit(0, 100), Some(0));
     }
 }

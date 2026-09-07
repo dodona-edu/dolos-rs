@@ -15,7 +15,7 @@ impl BitVec {
     }
 
     /// The number of words in the buffer.
-    pub fn len_words(&self) -> usize {
+    pub fn word_count(&self) -> usize {
         self.words.len()
     }
 
@@ -24,18 +24,21 @@ impl BitVec {
         self.words.is_empty()
     }
 
-    /// The `len`-bit region starting at word `word_base`.
+    /// The `length`-bit region starting at word `word_base`.
     #[inline]
-    pub fn region(&self, word_base: usize, len: usize) -> BitRegion<'_> {
-        BitRegion::new(&self.words[word_base..word_base + len.div_ceil(64)], len)
+    pub fn region(&self, word_base: usize, length: usize) -> BitRegion<'_> {
+        BitRegion::new(
+            &self.words[word_base..word_base + length.div_ceil(64)],
+            length,
+        )
     }
 
-    /// The `len`-bit region starting at word `word_base`, for writing.
+    /// The `length`-bit region starting at word `word_base`, for writing.
     #[inline]
-    pub fn region_mut(&mut self, word_base: usize, len: usize) -> BitRegionMut<'_> {
+    pub fn region_mut(&mut self, word_base: usize, length: usize) -> BitRegionMut<'_> {
         BitRegionMut::new(
-            &mut self.words[word_base..word_base + len.div_ceil(64)],
-            len,
+            &mut self.words[word_base..word_base + length.div_ceil(64)],
+            length,
         )
     }
 }

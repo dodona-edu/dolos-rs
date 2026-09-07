@@ -6,77 +6,80 @@
 #[derive(Copy, Clone)]
 pub struct BitRegion<'a> {
     words: &'a [u64],
-    len: usize,
+    length: usize,
 }
 
 /// A mutable view over one bit-vector.
 pub struct BitRegionMut<'a> {
     words: &'a mut [u64],
-    len: usize,
+    length: usize,
 }
 
 impl<'a> BitRegion<'a> {
-    /// View `words` as a bit-vector of `len` bits.
+    /// View `words` as a bit-vector of `length` bits.
     #[inline]
-    pub fn new(words: &'a [u64], len: usize) -> Self {
+    pub fn new(words: &'a [u64], length: usize) -> Self {
         debug_assert_eq!(
             words.len(),
-            len.div_ceil(64),
-            "word count does not fit {len} bits"
+            length.div_ceil(64),
+            "word count does not fit {length} bits"
         );
-        Self { words, len }
+        Self { words, length }
     }
 
     /// The number of bits in the region.
     pub fn len(self) -> usize {
-        self.len
+        self.length
     }
 
     /// Whether the region holds no bits at all.
     pub fn is_empty(self) -> bool {
-        self.len == 0
+        self.length == 0
     }
 
     /// The bit at `position`.
     pub fn get(self, position: usize) -> bool {
-        debug_assert!(position < self.len, "position {position} is out of range");
+        debug_assert!(
+            position < self.length,
+            "position {position} is out of range"
+        );
         (self.words[position / 64] >> (position % 64)) & 1 == 1
     }
 
-    /// The number of set bits.
+    /// The number of `1` bits.
     pub fn count_ones(self) -> usize {
         self.words.iter().map(|w| w.count_ones() as usize).sum()
     }
 
-    /// The number of clear bits, padding excluded.
+    /// The number of `0` bits, padding excluded.
     pub fn count_zeros(self) -> usize {
-        self.len - self.count_ones()
+        self.length - self.count_ones()
     }
 
-    /// The index of the first set bit in `[start, end)`, or `None` when the
-    /// range is empty or holds no set bit.
+    /// The index of the first `1` bit in `[start, end)`, or `None` when the
+    /// range is empty or holds no `1` bit.
     ///
     /// Scans whole `u64` words, so the cost is per word inspected rather than
-    /// per bit. `end` is clamped to [`Self::len`].
-    pub fn next_set_bit(self, start: usize, end: usize) -> Option<usize> {
+    /// per bit. `end` must not exceed [`Self::len`].
+    pub fn next_one_bit(self, start: usize, end: usize) -> Option<usize> {
         next_bit(self.words, start, self.clamp(end), 0)
     }
 
-    /// The index of the first clear bit in `[start, end)`, or `None` when the
-    /// range is empty or entirely set.
+    /// The index of the first `0` bit in `[start, end)`, or `None` when the
+    /// range is empty or holds no `0` bit.
     ///
-    /// Paired with [`Self::next_set_bit`] this walks the region's alternating
-    /// runs without visiting every bit. `end` is clamped to [`Self::len`], so
+    /// Paired with [`Self::next_one_bit`] this walks the region's alternating
+    /// runs without visiting every bit. `end` must not exceed [`Self::len`], so
     /// the padding of the last word is never reported.
-    pub fn next_clear_bit(self, start: usize, end: usize) -> Option<usize> {
+    pub fn next_zero_bit(self, start: usize, end: usize) -> Option<usize> {
         next_bit(self.words, start, self.clamp(end), u64::MAX)
     }
 
-    /// The positions of the set bits, in ascending order.
+    /// The positions of the `1` bits, in ascending order.
     pub fn iter_ones(self) -> impl Iterator<Item = usize> + 'a {
         let mut cursor = 0;
         std::iter::from_fn(move || {
-            let position = self.next_set_bit(cursor, self.len)?;
+            let position = self.next_one_bit(cursor, self.length)?;
             cursor = position + 1;
             Some(position)
         })
@@ -84,45 +87,45 @@ impl<'a> BitRegion<'a> {
 
     /// Cut `end` down to the region's length.
     fn clamp(self, end: usize) -> usize {
-        debug_assert!(end <= self.len, "range end {end} is out of range");
-        end.min(self.len)
+        debug_assert!(end <= self.length, "range end {end} is out of range");
+        end.min(self.length)
     }
 }
 
 impl<'a> BitRegionMut<'a> {
-    /// View `words` as a bit-vector of `len` bits.
+    /// View `words` as a bit-vector of `length` bits.
     #[inline]
-    pub fn new(words: &'a mut [u64], len: usize) -> Self {
+    pub fn new(words: &'a mut [u64], length: usize) -> Self {
         debug_assert_eq!(
             words.len(),
-            len.div_ceil(64),
-            "word count does not fit {len} bits"
+            length.div_ceil(64),
+            "word count does not fit {length} bits"
         );
-        Self { words, len }
+        Self { words, length }
     }
 
     /// Set the bits `[start, start + length)`.
     #[inline]
     pub fn mark(&mut self, start: usize, length: usize) {
-        debug_assert!(start + length <= self.len, "range end is out of range");
+        debug_assert!(start + length <= self.length, "range end is out of range");
         update_range(self.words, start, length, true);
     }
 
     /// Clear the bits `[start, start + length)`.
     #[inline]
     pub fn clear(&mut self, start: usize, length: usize) {
-        debug_assert!(start + length <= self.len, "range end is out of range");
+        debug_assert!(start + length <= self.length, "range end is out of range");
         update_range(self.words, start, length, false);
     }
 
     /// Borrow the region for reading.
     pub fn as_region(&self) -> BitRegion<'_> {
-        BitRegion::new(self.words, self.len)
+        BitRegion::new(self.words, self.length)
     }
 }
 
-/// The index of the first bit in `[start, end)` that is set after `flip` is
-/// XORed in: `0` finds a set bit, `u64::MAX` a clear one.
+/// The index of the first bit in `[start, end)` that is one after `flip` is
+/// XORed in: `0` finds a `1` bit, `u64::MAX` a `0` bit.
 ///
 /// Range masking happens after the flip, so a clear-bit search never reports a
 /// bit outside `[start, end)`.
@@ -210,18 +213,18 @@ mod tests {
     use super::*;
     use rand::{RngExt, SeedableRng, rngs::StdRng};
 
-    /// A `len`-bit buffer with exactly `positions` set.
-    fn words_with(len: usize, positions: &[usize]) -> Vec<u64> {
-        let mut words = vec![0u64; len.div_ceil(64)];
-        let mut region = BitRegionMut::new(&mut words, len);
+    /// A `length`-bit buffer with exactly `positions` set.
+    fn words_with(length: usize, positions: &[usize]) -> Vec<u64> {
+        let mut words = vec![0u64; length.div_ceil(64)];
+        let mut region = BitRegionMut::new(&mut words, length);
         for &position in positions {
             region.mark(position, 1);
         }
         words
     }
 
-    /// The set bits in `[start, end)`, one bit at a time.
-    fn set_bits(region: BitRegion<'_>, start: usize, end: usize) -> Vec<usize> {
+    /// The `1` bits in `[start, end)`, one bit at a time.
+    fn one_bits(region: BitRegion<'_>, start: usize, end: usize) -> Vec<usize> {
         (start..end).filter(|&p| region.get(p)).collect()
     }
 
@@ -240,7 +243,7 @@ mod tests {
                 let mut region = BitRegionMut::new(&mut words, 192);
                 region.mark(start, length);
                 assert_eq!(
-                    set_bits(region.as_region(), 0, 192),
+                    one_bits(region.as_region(), 0, 192),
                     (start..start + length).collect::<Vec<_>>(),
                     "mark({start}, {length})"
                 );
@@ -256,7 +259,7 @@ mod tests {
         region.mark(0, 192);
         region.clear(60, 70); // spans all three words
         assert_eq!(region.as_region().count_ones(), 192 - 70);
-        assert_eq!(region.as_region().next_clear_bit(0, 192), Some(60));
+        assert_eq!(region.as_region().next_zero_bit(0, 192), Some(60));
 
         region.mark(60, 70);
         assert_eq!(region.as_region().count_ones(), 192);
@@ -271,11 +274,11 @@ mod tests {
 
         assert_eq!(region.count_ones(), 10);
         assert_eq!(region.count_zeros(), 0);
-        assert_eq!(region.next_clear_bit(0, 10), None);
+        assert_eq!(region.next_zero_bit(0, 10), None);
     }
 
     #[test]
-    fn iter_ones_lists_the_set_positions() {
+    fn iter_ones_lists_the_one_positions() {
         let positions = [0, 63, 64, 130];
         let words = words_with(192, &positions);
         let region = BitRegion::new(&words, 192);
@@ -285,7 +288,7 @@ mod tests {
     }
 
     #[test]
-    fn next_set_bit_matches_bit_by_bit_scan() {
+    fn next_one_bit_matches_bit_by_bit_scan() {
         let mut rng = StdRng::seed_from_u64(20250819);
         const BITS: usize = 200;
 
@@ -301,13 +304,13 @@ mod tests {
 
                 let mut found = Vec::new();
                 let mut at = start;
-                while let Some(position) = region.next_set_bit(at, end) {
+                while let Some(position) = region.next_one_bit(at, end) {
                     found.push(position);
                     at = position + 1;
                 }
                 assert_eq!(
                     found,
-                    set_bits(region, start, end),
+                    one_bits(region, start, end),
                     "range [{start}, {end}) over {positions:?}"
                 );
             }
@@ -315,7 +318,7 @@ mod tests {
     }
 
     #[test]
-    fn next_clear_bit_matches_bit_by_bit_scan() {
+    fn next_zero_bit_matches_bit_by_bit_scan() {
         let mut rng = StdRng::seed_from_u64(20250819);
         const BITS: usize = 200;
 
@@ -332,7 +335,7 @@ mod tests {
                 let (start, end) = (a.min(b), a.max(b));
 
                 assert_eq!(
-                    region.next_clear_bit(start, end),
+                    region.next_zero_bit(start, end),
                     (start..end).find(|&p| !region.get(p)),
                     "range [{start}, {end}) over {positions:?}"
                 );
