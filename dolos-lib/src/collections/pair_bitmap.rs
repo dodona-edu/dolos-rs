@@ -87,9 +87,12 @@ impl PairBitmap {
     pub fn mark_pair(&mut self, i: usize, j: usize, start_i: usize, start_j: usize, length: usize) {
         let (min, max, start_min, start_max) = ordered_pair_with(i, j, start_i, start_j);
         let base = self.pair_word_offset(min, max);
-        self.buf.mark(base, start_min, length);
         self.buf
-            .mark(base + self.word_counts[min], start_max, length);
+            .region_mut(base, self.lengths[min])
+            .mark(start_min, length);
+        self.buf
+            .region_mut(base + self.word_counts[min], self.lengths[max])
+            .mark(start_max, length);
     }
 
     // ── private helpers ──────────────────────────────────────────────

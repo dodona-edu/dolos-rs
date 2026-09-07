@@ -1,4 +1,4 @@
-use crate::collections::bit_region::{BitRegion, BitRegionMut, update_range};
+use crate::collections::bit_region::{BitRegion, BitRegionMut};
 
 /// A flat, contiguous buffer of `u64` words, carved into bit-vector regions.
 ///
@@ -22,13 +22,6 @@ impl BitVec {
     /// Whether the buffer holds no words at all.
     pub fn is_empty(&self) -> bool {
         self.words.is_empty()
-    }
-
-    /// Set the bits `[start, start + length)` of the bit-vector that begins at
-    /// word `word_base`.
-    #[inline]
-    pub fn mark(&mut self, word_base: usize, start: usize, length: usize) {
-        update_range(&mut self.words[word_base..], start, length, true);
     }
 
     /// The `len`-bit region starting at word `word_base`.

@@ -157,7 +157,7 @@ fn next_bit(words: &[u64], start: usize, end: usize, flip: u64) -> Option<usize>
 
 /// Set or clear the bits `[start, start + length)` of `words`.
 #[inline]
-pub(crate) fn update_range(words: &mut [u64], start: usize, length: usize, set: bool) {
+fn update_range(words: &mut [u64], start: usize, length: usize, set: bool) {
     if length == 0 {
         return;
     }
