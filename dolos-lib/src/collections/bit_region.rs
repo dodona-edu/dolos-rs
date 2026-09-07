@@ -1,5 +1,3 @@
-use crate::collections::word_slice::WordSlice;
-
 /// A borrowed view over one bit-vector: the packed `u64` words plus the number
 /// of bits they hold.
 ///
@@ -47,7 +45,7 @@ impl<'a> BitRegion<'a> {
 
     /// The number of set bits.
     pub fn count_ones(self) -> usize {
-        self.words().count_ones()
+        self.words.iter().map(|w| w.count_ones() as usize).sum()
     }
 
     /// The number of clear bits, padding excluded.
@@ -82,11 +80,6 @@ impl<'a> BitRegion<'a> {
             cursor = position + 1;
             Some(position)
         })
-    }
-
-    /// The packed `u64` words backing the region.
-    pub fn words(self) -> WordSlice<'a> {
-        WordSlice::new(self.words)
     }
 
     /// Cut `end` down to the region's length.
