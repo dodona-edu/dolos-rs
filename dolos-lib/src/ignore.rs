@@ -32,16 +32,14 @@ pub struct IgnoredFingerprints {
     /// Bit `p` of item `f` is set when position `p` of file `f` is ignored;
     /// `None` when no position of any file is ignored.
     ignored_bitmap: Option<VecBitmap>,
-    /// Fingerprint count per file.
-    lengths: Vec<usize>,
 }
 
 impl IgnoredFingerprints {
-    /// The number of fingerprints in `file` that count toward the metrics.
-    pub fn effective_length(&self, file: usize) -> usize {
+    /// The number of ignored positions in `file`.
+    pub fn ignored_count(&self, file: usize) -> usize {
         match self.ignored_bitmap.as_ref() {
-            Some(mask) => mask.item(file).count_zeros(),
-            None => self.lengths[file],
+            Some(mask) => mask.item(file).count_ones(),
+            None => 0,
         }
     }
 
@@ -132,7 +130,7 @@ pub fn classify(
         }
     }
 
-    IgnoredFingerprints { ignored_bitmap: mask, lengths }
+    IgnoredFingerprints { ignored_bitmap: mask }
 }
 
 #[cfg(test)]
@@ -234,7 +232,7 @@ mod tests {
         let files = seqs(&["", "AB", ""]);
         let ignored = classify(&files, &seqs(&["A"]), None);
 
-        assert_eq!(ignored.effective_length(0), 0);
+        assert_eq!(ignored.ignored_count(0), 0);
         assert_eq!(marked(&ignored, &files), vec![vec![], vec![0], vec![]]);
     }
 
@@ -257,6 +255,6 @@ mod tests {
 
         let expected: Vec<usize> = (0..100).filter(|i| i % 7 == 0).collect();
         assert_eq!(marked(&ignored, &files), vec![expected.clone()]);
-        assert_eq!(ignored.effective_length(0), 100 - expected.len());
+        assert_eq!(ignored.ignored_count(0), expected.len());
     }
 }

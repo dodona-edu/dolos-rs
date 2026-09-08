@@ -112,8 +112,11 @@ impl<'a> MatchCollector<'a> {
     /// shared match, and the totals exclude ignored fingerprints.
     fn build_metrics(&self) -> PairArray<PairMetrics> {
         let mut metrics = PairArray::new(self.sequences.len(), PairMetrics::default());
-        let totals: Vec<usize> = (0..self.sequences.len())
-            .map(|seq| self.ignored.effective_length(seq))
+        let totals: Vec<usize> = self
+            .sequences
+            .iter()
+            .enumerate()
+            .map(|(seq, sequence)| sequence.len() - self.ignored.ignored_count(seq))
             .collect();
 
         for i in 0..self.sequences.len() {
