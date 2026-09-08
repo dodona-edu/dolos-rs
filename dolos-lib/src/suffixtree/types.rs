@@ -51,9 +51,9 @@ pub struct Match {
 pub struct PairMetrics {
     /// Jaccard-style similarity: `(overlap_left + overlap_right) / (total_left + total_right)`.
     pub similarity: f64,
-    /// Total number of fingerprints in the left file.
+    /// Number of fingerprints in the left file, excluding ignored ones.
     pub total_left: usize,
-    /// Total number of fingerprints in the right file.
+    /// Number of fingerprints in the right file, excluding ignored ones.
     pub total_right: usize,
     /// Number of fingerprints in the left file covered by at least one match.
     pub overlap_left: usize,
