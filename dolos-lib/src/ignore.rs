@@ -31,7 +31,7 @@ struct Entry {
 pub struct IgnoredFingerprints {
     /// Bit `p` of item `f` is set when position `p` of file `f` is ignored;
     /// `None` when no position of any file is ignored.
-    mask: Option<VecBitmap>,
+    ignored_bitmap: Option<VecBitmap>,
     /// Fingerprint count per file.
     lengths: Vec<usize>,
 }
@@ -39,7 +39,7 @@ pub struct IgnoredFingerprints {
 impl IgnoredFingerprints {
     /// The number of fingerprints in `file` that count toward the metrics.
     pub fn effective_length(&self, file: usize) -> usize {
-        match self.mask.as_ref() {
+        match self.ignored_bitmap.as_ref() {
             Some(mask) => mask.item(file).count_zeros(),
             None => self.lengths[file],
         }
@@ -47,29 +47,35 @@ impl IgnoredFingerprints {
 
     /// Whether no position of any file is ignored.
     pub fn is_empty(&self) -> bool {
-        self.mask.is_none()
+        self.ignored_bitmap.is_none()
     }
 
     /// The maximal ignore-free runs of `file` within `range`, in ascending
     /// order. Ignored positions act as barriers, so no run spans one.
-    pub fn usable_runs(
+    pub fn runs(
         &self,
         file: usize,
         range: Range<usize>,
     ) -> impl Iterator<Item = Range<usize>> + '_ {
         let Range { mut start, end } = range;
-        std::iter::from_fn(move || match self.mask.as_ref() {
-            // Nothing is ignored: the range is a single run.
-            None => (start < end).then(|| std::mem::replace(&mut start, end)..end),
-            // Alternating the two scans walks the runs without visiting every
-            // position.
-            Some(mask) => {
-                let item = mask.item(file);
-                let run_start = item.next_zero_bit(start, end)?;
-                let run_end = item.next_one_bit(run_start, end).unwrap_or(end);
-                start = run_end;
-                Some(run_start..run_end)
+
+        std::iter::from_fn(move || {
+            if start >= end {
+                return None;
             }
+
+            let run = match &self.ignored_bitmap {
+                None => start..end,
+                Some(mask) => {
+                    let item = mask.item(file);
+                    let start = item.next_zero_bit(start, end)?;
+                    let end = item.next_one_bit(start, end).unwrap_or(end);
+                    start..end
+                }
+            };
+
+            start = run.end;
+            Some(run)
         })
     }
 }
@@ -126,7 +132,7 @@ pub fn classify(
         }
     }
 
-    IgnoredFingerprints { mask, lengths }
+    IgnoredFingerprints { ignored_bitmap: mask, lengths }
 }
 
 #[cfg(test)]
@@ -153,7 +159,7 @@ mod tests {
     /// The ignored positions of `file`: the complement of its usable runs.
     fn ignored_positions(ignored: &IgnoredFingerprints, file: usize, length: usize) -> Vec<usize> {
         let mut usable = vec![false; length];
-        for run in ignored.usable_runs(file, 0..length) {
+        for run in ignored.runs(file, 0..length) {
             usable[run].fill(true);
         }
         (0..length).filter(|&position| !usable[position]).collect()
@@ -203,12 +209,12 @@ mod tests {
         let files = seqs(&["ABXCDXX", "AB"]);
         let ignored = classify(&files, &seqs(&["X"]), None);
 
-        let runs: Vec<Range<usize>> = ignored.usable_runs(0, 0..7).collect();
+        let runs: Vec<Range<usize>> = ignored.runs(0, 0..7).collect();
         assert_eq!(runs, vec![0..2, 3..5]);
         // A range may start inside an ignored stretch and end inside a run.
-        assert_eq!(ignored.usable_runs(0, 2..4).collect::<Vec<_>>(), vec![3..4]);
+        assert_eq!(ignored.runs(0, 2..4).collect::<Vec<_>>(), vec![3..4]);
         // A file without a single ignored position is one run.
-        assert_eq!(ignored.usable_runs(1, 0..2).collect::<Vec<_>>(), vec![0..2]);
+        assert_eq!(ignored.runs(1, 0..2).collect::<Vec<_>>(), vec![0..2]);
     }
 
     #[test]
@@ -216,9 +222,9 @@ mod tests {
         let files = seqs(&["ABCDE"]);
         let ignored = classify(&files, &[], None);
 
-        assert_eq!(ignored.usable_runs(0, 1..4).collect::<Vec<_>>(), vec![1..4]);
+        assert_eq!(ignored.runs(0, 1..4).collect::<Vec<_>>(), vec![1..4]);
         // An empty range yields no run at all.
-        assert!(ignored.usable_runs(0, 2..2).next().is_none());
+        assert!(ignored.runs(0, 2..2).next().is_none());
     }
 
     // ── Shapes and accessors ──────────────────────────────────────────

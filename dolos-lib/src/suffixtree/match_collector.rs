@@ -57,8 +57,10 @@ impl<'a> MatchCollector<'a> {
 
         // Only `sp1`'s mask is walked: the two sides of an exact match hold
         // equal values, so they are ignored at the same offsets.
-        let ignored = self.ignored;
-        for run in ignored.usable_runs(sp1.sequence_index, sp1.start..sp1.start + length) {
+        for run in self
+            .ignored
+            .runs(sp1.sequence_index, sp1.start..sp1.start + length)
+        {
             let delta = run.start - sp1.start;
             self.record_run(&sp1.shifted(delta), &sp2.shifted(delta), run.len());
         }
@@ -111,7 +113,7 @@ impl<'a> MatchCollector<'a> {
     fn build_metrics(&self) -> PairArray<PairMetrics> {
         let mut metrics = PairArray::new(self.sequences.len(), PairMetrics::default());
         let totals: Vec<usize> = (0..self.sequences.len())
-            .map(|file| self.ignored.effective_length(file))
+            .map(|seq| self.ignored.effective_length(seq))
             .collect();
 
         for i in 0..self.sequences.len() {

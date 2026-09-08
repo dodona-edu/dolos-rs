@@ -64,18 +64,11 @@ fn is_sorted_desc<T, K: PartialOrd>(items: &[T], key: impl Fn(&T) -> K) -> bool 
 #[case::kgrams_in_window(SAMPLE12, DolosConfig::builder().kgrams_in_window(5).build().unwrap(), 0.479020979020979)]
 #[case::include_comments(SAMPLE12, DolosConfig::builder().include_comments(true).build().unwrap(), 0.47619047619047616)]
 #[case::min_length_match(SAMPLE12, DolosConfig::builder().min_length_match(10).build().unwrap(), 0.20588235294117646)]
-// Cap is Some(2) over 3 files. Totals 48 and 62 (from 96 and 108), overlap 2 + 2.
 #[case::max_fingerprint_count(SAMPLE123, DolosConfig::builder().max_fingerprint_count(2).build().unwrap(), 0.03636363636363636)]
-// (3 * 0.7).round() == 2, the same cap, hence the same number.
 #[case::max_fingerprint_percentage(SAMPLE123, DolosConfig::builder().max_fingerprint_percentage(0.7).build().unwrap(), 0.03636363636363636)]
-// The template removes 9 fingerprints from each file: totals 87 and 99,
-// overlap 41 + 40.
 #[case::ignore(SAMPLE12, DolosConfig::builder().ignore(IGNORE).build().unwrap(), 0.43548387096774194)]
-// A template sharing nothing must reproduce the default case exactly.
 #[case::inert_ignore(SAMPLE12, DolosConfig::builder().ignore(IGNORE_INERT).build().unwrap(), 0.4803921568627451)]
-// (3 * 0.1).round() == 0: every present value is ignored, both totals hit 0.
 #[case::cap_of_zero(SAMPLE123, DolosConfig::builder().max_fingerprint_percentage(0.1).build().unwrap(), 0.0)]
-// A cap of 3 over 3 files can never be exceeded.
 #[case::cap_at_file_count(SAMPLE123, DolosConfig::builder().max_fingerprint_count(3).build().unwrap(), 0.4803921568627451)]
 fn test_similarities(
     #[case] files: &[&str],
