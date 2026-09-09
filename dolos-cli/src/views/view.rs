@@ -6,8 +6,8 @@ use std::io::Result;
 
 /// Shows the results of an analysis.
 pub trait View {
-    /// Show the report. Returns when the report is shown: the files are
-    /// written, or the user stopped the server.
+    /// Show the report. Blocks until the output is complete: the report is
+    /// printed, the files are written, or the web server has stopped.
     fn show(&self, report: &Report) -> Result<()>;
 }
 
