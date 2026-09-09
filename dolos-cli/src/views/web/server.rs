@@ -1,6 +1,4 @@
 use axum::Router;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use std::io::{Error, Result};
 use std::path::{Path, PathBuf};
 use tower_http::services::ServeDir;
@@ -14,7 +12,7 @@ pub struct Server {
 
 /// Serve `report_dir` until the process is stopped.
 pub fn serve(report_dir: &Path, server: &Server) -> Result<()> {
-    let router = build_router(report_dir.to_path_buf());
+    let router = build_router(report_dir, &webroot());
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()?;
@@ -37,40 +35,40 @@ pub fn serve(report_dir: &Path, server: &Server) -> Result<()> {
     })
 }
 
-/// Route the report directory and the frontend.
-fn build_router(report_dir: PathBuf) -> Router {
-    Router::new()
-        // The frontend reads the report from `/data`.
-        // TODO: the TypeScript frontend also reads `kgrams.csv`, which this CLI does not write yet.
-        .nest_service("/data", ServeDir::new(report_dir))
-        // TODO: serve the dolos-web frontend assets here once the Rust CLI moves into
-        // dodona-edu/dolos. Every non-`/data` path must resolve against the frontend webroot,
-        // and a path that ends in `/` must resolve to its `index.html`.
-        .fallback(frontend_unavailable)
+/// The directory with the dolos-web frontend files.
+// TODO: decide where the frontend files come from and return that directory here.
+// The Node CLI takes the path from the `@dodona/dolos-web` package (`webroot()`).
+// This build needs its own source: a path from the build script, an embedded copy of
+// the assets, or a path from an environment variable.
+fn webroot() -> PathBuf {
+    todo!("return the directory with the dolos-web frontend files")
 }
 
-/// Placeholder for the frontend that is not bundled yet.
-async fn frontend_unavailable() -> impl IntoResponse {
-    (
-        StatusCode::NOT_FOUND,
-        "The dolos-web frontend is not bundled in this build. The report data is served under /data.",
-    )
+/// Route the report directory and the frontend.
+fn build_router(report_dir: &Path, webroot: &Path) -> Router {
+    Router::new()
+        // The frontend reads the report from `/data`.
+        .nest_service("/data", ServeDir::new(report_dir))
+        // Every other path is a frontend file. A directory serves its `index.html`.
+        .fallback_service(ServeDir::new(webroot))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use axum::body::Body;
-    use axum::http::Request;
+    use axum::http::{Request, StatusCode};
     use tower::ServiceExt;
 
-    /// `/data` serves the report files; every other path falls back to the
-    /// missing frontend.
+    /// `/data` serves the report files, `/` serves the frontend `index.html`, and
+    /// an unknown path returns 404.
     #[tokio::test]
     async fn test_routes() {
-        let dir = tempfile::TempDir::new().unwrap();
-        std::fs::write(dir.path().join("pairs.csv"), "file1_id\n").unwrap();
-        let router = build_router(dir.path().to_path_buf());
+        let report_dir = tempfile::TempDir::new().unwrap();
+        std::fs::write(report_dir.path().join("pairs.csv"), "file1_id\n").unwrap();
+        let webroot = tempfile::TempDir::new().unwrap();
+        std::fs::write(webroot.path().join("index.html"), "<html></html>").unwrap();
+        let router = build_router(report_dir.path(), webroot.path());
 
         let get = |path: &str| {
             router
@@ -86,6 +84,10 @@ mod tests {
             get("/data/missing.csv").await.unwrap().status(),
             StatusCode::NOT_FOUND
         );
-        assert_eq!(get("/").await.unwrap().status(), StatusCode::NOT_FOUND);
+        assert_eq!(get("/").await.unwrap().status(), StatusCode::OK);
+        assert_eq!(
+            get("/missing").await.unwrap().status(),
+            StatusCode::NOT_FOUND
+        );
     }
 }
