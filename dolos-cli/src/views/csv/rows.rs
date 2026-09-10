@@ -1,4 +1,4 @@
-use dolos::{File, Fragment, Pair, Point};
+use dolos::{File, Fragment, Pair, Point, Region};
 use serde::Serialize;
 use std::borrow::Cow;
 
@@ -18,21 +18,46 @@ impl<'a> MetadataRow<'a> {
 }
 
 /// One row of `files.csv`.
+///
+/// The last three columns hold the data needed to run the analysis again without the source
+/// files. They are always present and stay empty unless `--include-analysis-data` was given.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
     id: usize,
     path: Cow<'a, str>,
     content: &'a str,
+    fingerprints: Option<String>,
+    fingerprint_regions: Option<String>,
+    ignored_intervals: Option<String>,
 }
 
 impl<'a> FileRow<'a> {
-    pub const HEADER: [&'static str; 3] = ["id", "path", "content"];
+    pub const HEADER: [&'static str; 6] = [
+        "id",
+        "path",
+        "content",
+        "fingerprints",
+        "fingerprint_regions",
+        "ignored_intervals",
+    ];
 
     pub fn new(file: &'a File) -> Self {
+        let data = file.analysis_data.as_ref();
         Self {
             id: file.id,
             path: file.relative_path.to_string_lossy(),
             content: &file.content,
+            fingerprints: data
+                .map(|data| json_array(data.fingerprints.iter().map(usize::to_string))),
+            fingerprint_regions: data
+                .map(|data| json_array(data.regions.iter().flat_map(quad).map(|n| n.to_string()))),
+            ignored_intervals: data.map(|data| {
+                json_array(
+                    data.ignored
+                        .iter()
+                        .map(|r| format!("[{},{}]", r.start, r.len())),
+                )
+            }),
         }
     }
 }
@@ -126,4 +151,19 @@ impl<'a> FragmentRow<'a> {
 
 fn point(point: &Point) -> String {
     format!("{}:{}", point.row, point.column)
+}
+
+/// A region as the four numbers `start row, start column, end row, end column`.
+fn quad(region: &Region) -> [usize; 4] {
+    [
+        region.start_point.row,
+        region.start_point.column,
+        region.end_point.row,
+        region.end_point.column,
+    ]
+}
+
+/// Format `items` as a JSON array: `[1,2,3]` or `[[1,2],[3,4]]`.
+fn json_array(items: impl IntoIterator<Item = String>) -> String {
+    format!("[{}]", items.into_iter().collect::<Vec<_>>().join(","))
 }
