@@ -3,5 +3,18 @@ name = "dolos-core"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+# cdylib for the wasm-pack build, rlib so dolos-lib keeps linking it normally.
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Off by default: a normal build pulls none of the dependencies below.
+wasm = ["dep:wasm-bindgen", "dep:serde", "dep:tsify-next"]
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+tsify-next = { version = "0.5.6", features = ["js"], optional = true }
+wasm-bindgen = { version = "0.2.106", optional = true }
+
 [dev-dependencies]
 rand = "0.10.1"
