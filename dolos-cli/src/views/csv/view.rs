@@ -81,7 +81,7 @@ fn pair_columns() -> [Column<Pair>; 10] {
             p.right_file.relative_path.display().to_string()
         }),
         Column::new("similarity", |p| p.metrics.similarity.to_string()),
-        Column::new("longest", |p| p.metrics.longest_fragment.to_string()),
+        Column::new("longest", |p| p.metrics.longest_match.to_string()),
         Column::new("totalLeft", |p| p.metrics.total_left.to_string()),
         Column::new("totalRight", |p| p.metrics.total_right.to_string()),
         Column::new("overlapLeft", |p| p.metrics.overlap_left.to_string()),
