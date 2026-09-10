@@ -1,4 +1,4 @@
-use dolos::{Dolos, DolosConfig, PairSortBy};
+use dolos::{Dolos, DolosConfig, PairSortBy, Report};
 use rstest::rstest;
 use std::path::PathBuf;
 
@@ -22,10 +22,14 @@ fn to_path_buf(names: &[&str]) -> Vec<PathBuf> {
     names.iter().map(PathBuf::from).collect()
 }
 
-fn pair_sim(files: &[&str], config: DolosConfig) -> f64 {
-    let report = Dolos::new(to_path_buf(files), config)
+fn report(files: &[&str], config: DolosConfig) -> Report {
+    Dolos::new(to_path_buf(files), config)
         .unwrap()
-        .build_report();
+        .build_report()
+}
+
+fn pair_sim(files: &[&str], config: DolosConfig) -> f64 {
+    let report = report(files, config);
 
     report
         .pairs
@@ -82,9 +86,7 @@ fn test_similarities(
 
 #[test]
 fn test_two_files_have_fragments() {
-    let report = Dolos::new(to_path_buf(SAMPLE12), DolosConfig::default())
-        .unwrap()
-        .build_report();
+    let report = report(SAMPLE12, DolosConfig::default());
 
     for pair in &report.pairs {
         assert!(
@@ -96,9 +98,7 @@ fn test_two_files_have_fragments() {
 
 #[test]
 fn test_three_files_no_fragments() {
-    let report = Dolos::new(to_path_buf(SAMPLE123), DolosConfig::default())
-        .unwrap()
-        .build_report();
+    let report = report(SAMPLE123, DolosConfig::default());
 
     for pair in &report.pairs {
         assert!(
@@ -116,12 +116,10 @@ fn test_three_files_no_fragments() {
 #[case::total_overlap(PairSortBy::TotalOverlap)]
 #[case::longest_fragment(PairSortBy::LongestFragment)]
 fn test_sort_by(#[case] sort_by: PairSortBy) {
-    let report = Dolos::new(
-        to_path_buf(SAMPLE123),
+    let report = report(
+        SAMPLE123,
         DolosConfig::builder().sort_by(sort_by).build().unwrap(),
-    )
-    .unwrap()
-    .build_report();
+    );
 
     let ordered = match sort_by {
         PairSortBy::Similarity => is_sorted_desc(&report.pairs, |p| p.metrics.similarity),
@@ -153,5 +151,84 @@ fn test_input_modes() {
     for input in inputs {
         let sim = pair_sim(&[input], DolosConfig::default());
         assert_eq!(sim, base_sim, "{input}: similarity must match baseline");
+    }
+}
+
+// ── Analysis data export ──────────────────────────────────────────────────────
+
+#[test]
+fn analysis_data_is_absent_by_default() {
+    let report = report(SAMPLE12, DolosConfig::default());
+
+    for file in &report.files {
+        assert!(
+            file.analysis_data.is_none(),
+            "analysis data must not be exported without include_analysis_data"
+        );
+    }
+}
+
+/// Every file carries its fingerprints with one region each, and nothing is
+/// ignored when no template and no cap is given.
+#[test]
+fn analysis_data_holds_a_region_per_fingerprint() {
+    let config = DolosConfig::builder()
+        .include_analysis_data(true)
+        .build()
+        .unwrap();
+    let report = report(SAMPLE123, config);
+
+    assert_eq!(report.files.len(), 3);
+    for file in &report.files {
+        let data = file
+            .analysis_data
+            .as_ref()
+            .expect("analysis data is present when include_analysis_data is set");
+
+        assert!(!data.fingerprints.is_empty());
+        assert_eq!(data.fingerprints.len(), data.regions.len());
+        assert!(data.ignored.is_empty());
+    }
+}
+
+/// A template marks the positions of its own fingerprints as ignored, and the
+/// intervals stay inside the file.
+#[test]
+fn a_template_shows_up_as_ignored_intervals() {
+    let config = DolosConfig::builder()
+        .include_analysis_data(true)
+        .ignore(IGNORE)
+        .build()
+        .unwrap();
+    let report = report(SAMPLE12, config);
+
+    for file in &report.files {
+        let data = file.analysis_data.as_ref().unwrap();
+        let ignored: usize = data.ignored.iter().map(|r| r.len()).sum();
+
+        assert!(!data.ignored.is_empty(), "the template ignores nothing");
+        assert!(ignored < data.fingerprints.len(), "everything is ignored");
+        assert!(
+            data.ignored
+                .iter()
+                .all(|r| r.end <= data.fingerprints.len())
+        );
+        // The intervals are maximal runs, so they never touch.
+        assert!(data.ignored.windows(2).all(|w| w[0].end < w[1].start));
+    }
+}
+
+/// A template that shares no fingerprint with the input ignores nothing.
+#[test]
+fn an_inert_template_ignores_nothing() {
+    let config = DolosConfig::builder()
+        .include_analysis_data(true)
+        .ignore(IGNORE_INERT)
+        .build()
+        .unwrap();
+    let report = report(SAMPLE12, config);
+
+    for file in &report.files {
+        assert!(file.analysis_data.as_ref().unwrap().ignored.is_empty());
     }
 }
