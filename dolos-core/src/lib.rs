@@ -16,6 +16,8 @@ mod ignore;
 mod suffixtree;
 #[cfg(test)]
 mod test_utils;
+#[cfg(feature = "wasm")]
+mod wasm;
 
 pub use analysis::{AnalysisOptions, analyze};
 pub use collections::pair_array::PairArray;

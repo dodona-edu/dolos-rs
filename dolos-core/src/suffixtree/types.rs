@@ -35,6 +35,8 @@ impl StartPosition {
 /// and right (larger-index) sequence respectively. The owning [`PairArray`]
 /// tracks *which* sequences the pair refers to.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "wasm", derive(serde::Serialize, tsify_next::Tsify))]
+#[cfg_attr(feature = "wasm", serde(rename_all = "camelCase"))]
 pub struct Match {
     /// Start offset in the left sequence.
     pub left_start: usize,
@@ -46,6 +48,8 @@ pub struct Match {
 
 /// Per-pair metrics produced by the suffix-tree analysis.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[cfg_attr(feature = "wasm", derive(serde::Serialize, tsify_next::Tsify))]
+#[cfg_attr(feature = "wasm", serde(rename_all = "camelCase"))]
 pub struct PairMetrics {
     /// Jaccard-style similarity: `(overlap_left + overlap_right) / (total_left + total_right)`.
     pub similarity: f64,

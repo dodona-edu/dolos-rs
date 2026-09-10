@@ -41,6 +41,23 @@ jobs:
       - run: cargo fmt --check
       - run: cargo clippy --features all-languages -- -D warnings
 
+  wasm:
+    name: "wasm 🕸"
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup update stable && rustup default stable
+      - run: rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p dolos-core --features wasm
+      - run: cargo clippy -p dolos-core --features wasm --all-targets -- -D warnings
+      # The package is the deliverable, so build it: this is what fails when the
+      # binding breaks rather than the algorithm, including wasm-bindgen skew.
+      # rust-cache keeps the installed binary between runs.
+      - run: cargo install wasm-pack --locked
+      - run: wasm-pack build dolos-core --target bundler --features wasm
+
   test:
     name: "test 🧪"
     needs: build
