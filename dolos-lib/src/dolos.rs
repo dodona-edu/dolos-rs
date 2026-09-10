@@ -4,10 +4,10 @@ use crate::ignore;
 use crate::metadata::Metadata;
 use crate::reader::Dataset;
 use crate::report::Report;
-use crate::suffixtree::SuffixTree;
 use crate::winnowing::fingerprints::{Fingerprint, Winnow};
 use crate::winnowing::region::Region;
 use crate::winnowing::tokenizer::{Tokenizer, Tokens};
+use dolos_core::AnalysisOptions;
 use std::fmt;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
@@ -126,20 +126,18 @@ impl Dolos {
         Ok(())
     }
 
-    /// Run the suffix-tree analysis and build a [`Report`].
+    /// Run the analysis and build a [`Report`].
     pub fn build_report(self) -> Report {
         let ignored = ignore::classify(
             &self.hashes,
             &self.ignore_hashes,
             self.metadata.max_fingerprint_file_count,
         );
-        let tree = SuffixTree::build(&self.hashes);
-        let result = tree.analyze(
-            &self.hashes,
-            &ignored,
-            self.metadata.min_length_match,
-            self.metadata.include_fragments,
-        );
+        let options = AnalysisOptions {
+            min_match_length: self.metadata.min_length_match,
+            keep_matches: self.metadata.include_fragments,
+        };
+        let result = dolos_core::analyze(&self.hashes, &ignored, &options);
         Report::new(result, self.files, self.locations, self.metadata)
     }
 }
