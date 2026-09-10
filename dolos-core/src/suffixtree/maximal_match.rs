@@ -1,11 +1,12 @@
-use crate::ignore::IgnoredFingerprints;
+use crate::Symbol;
+use crate::ignore::IgnoreMask;
 use crate::suffixtree::match_collector::MatchCollector;
 use crate::suffixtree::node::Node;
 use crate::suffixtree::tree::SuffixTree;
-use crate::suffixtree::types::{AnalysisResult, SENTINEL_SYMBOL, StartPosition, SymbolType};
+use crate::suffixtree::types::{AnalysisResult, SENTINEL_SYMBOL, StartPosition};
 use std::collections::HashMap;
 
-type LeftMap = HashMap<SymbolType, Vec<StartPosition>>;
+type LeftMap = HashMap<Symbol, Vec<StartPosition>>;
 
 /// Analyzer for finding maximal exact matches in a generalized suffix tree.
 ///
@@ -18,13 +19,13 @@ pub struct MaximalMatchAnalyzer<'a> {
     /// The generalized suffix tree built from all sequences.
     tree: &'a SuffixTree,
     /// The original sequences, without explicit end-of-sequence sentinels.
-    sequences: &'a [Vec<SymbolType>],
-    /// Only matches of at least this many tokens are considered.
+    sequences: &'a [Vec<Symbol>],
+    /// Only matches of at least this many symbols are considered.
     min_match_length: usize,
-    /// Whether to keep fragments of all the similar matches.
-    pub keep_fragments: bool,
-    /// Which fingerprint positions are ignored; forwarded to the collector.
-    ignored: &'a IgnoredFingerprints,
+    /// Whether to keep the raw matches in the result.
+    pub keep_matches: bool,
+    /// Which positions are ignored; forwarded to the collector.
+    ignored: &'a IgnoreMask,
 }
 
 impl<'a> MaximalMatchAnalyzer<'a> {
@@ -33,18 +34,18 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     /// # Arguments
     /// * `tree` – Generalized suffix tree built from all `sequences`.
     /// * `sequences` – The sequences to analyze.
-    /// * `ignored` – Which fingerprint positions are ignored.
-    /// * `min_match_length` – Minimum number of tokens a shared substring must
+    /// * `ignored` – Which positions are ignored.
+    /// * `min_match_length` – Minimum number of symbols a shared substring must
     ///   have to be counted as a match.
-    /// * `keep_fragments` – Whether to store raw matches for fragment resolution.
+    /// * `keep_matches` – Whether to keep the raw matches in the result.
     pub fn new(
         tree: &'a SuffixTree,
-        sequences: &'a [Vec<SymbolType>],
-        ignored: &'a IgnoredFingerprints,
+        sequences: &'a [Vec<Symbol>],
+        ignored: &'a IgnoreMask,
         min_match_length: usize,
-        keep_fragments: bool,
+        keep_matches: bool,
     ) -> Self {
-        Self { tree, sequences, ignored, min_match_length, keep_fragments }
+        Self { tree, sequences, ignored, min_match_length, keep_matches }
     }
 
     /// Perform the full MEM analysis and return pairwise similarity results.
@@ -52,7 +53,7 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     /// Traverses the suffix tree depth-first, identifies all maximal exact
     /// matches that meet `min_match_length`, and aggregates them into an
     /// [`AnalysisResult`] containing per-pair similarity scores and longest
-    /// fragment lengths.
+    /// longest-match lengths.
     ///
     /// A match is suppressed only when its length does not meet
     /// `min_match_length`.
@@ -61,7 +62,7 @@ impl<'a> MaximalMatchAnalyzer<'a> {
             self.sequences,
             self.ignored,
             self.min_match_length,
-            self.keep_fragments,
+            self.keep_matches,
         );
         self.find_maximal_pairs(0, 0, &mut collector);
         collector.into_result()
@@ -215,16 +216,15 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     ///   sentinel (two suffixes both starting at position 0 in different sequences
     ///   should still be paired).
     #[inline]
-    fn should_process_pair(left_symbol: SymbolType, other_left_symbol: SymbolType) -> bool {
+    fn should_process_pair(left_symbol: Symbol, other_left_symbol: Symbol) -> bool {
         other_left_symbol != left_symbol || left_symbol == SENTINEL_SYMBOL
     }
 
     /// Record a match for every cross-sequence pair between `positions1` and `positions2`.
     ///
-    /// Positions that belong to the *same* sequence are skipped — a suffix can only
-    /// form a meaningful plagiarism signal when it appears in two *different*
-    /// source files. For each valid cross-sequence pair the current string `depth`
-    /// is used as the match length.
+    /// Positions that belong to the *same* sequence are skipped — only matches
+    /// between two *different* sequences are meaningful. For each valid
+    /// cross-sequence pair the current string `depth` is used as the match length.
     fn process_position_pairs(
         &self,
         positions1: &[StartPosition],
