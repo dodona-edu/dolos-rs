@@ -33,6 +33,11 @@ impl IgnoredPositions {
         Self::default()
     }
 
+    /// The number of sequences the ranges cover. `0` when nothing is ignored.
+    pub(crate) fn sequence_count(&self) -> usize {
+        self.per_sequence.len()
+    }
+
     /// The ignored ranges of `sequence`, in ascending order.
     pub fn ranges(&self, sequence: usize) -> &[Range<usize>] {
         self.per_sequence.get(sequence).map_or(&[], Vec::as_slice)

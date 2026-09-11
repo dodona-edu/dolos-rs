@@ -1,6 +1,6 @@
 use crate::Symbol;
 use crate::ignore::IgnoredPositions;
-use crate::suffixtree::{AnalysisResult, SuffixTree};
+use crate::suffixtree::{AnalysisResult, SENTINEL_SYMBOL, SuffixTree};
 
 /// Options controlling an [`analyze`] run.
 pub struct AnalysisOptions {
@@ -21,6 +21,18 @@ pub fn analyze(
     ignored: &IgnoredPositions,
     options: &AnalysisOptions,
 ) -> AnalysisResult {
+    debug_assert!(
+        ignored.sequence_count() == sequences.len() || ignored.sequence_count() == 0,
+        "ignored covers {} sequences, the analysis has {}",
+        ignored.sequence_count(),
+        sequences.len()
+    );
+
+    debug_assert!(
+        sequences.iter().flatten().all(|&s| s != SENTINEL_SYMBOL),
+        "a sequence holds usize::MAX, which is reserved as the end-of-sequence sentinel"
+    );
+
     let lengths: Vec<usize> = sequences.iter().map(Vec::len).collect();
     let mask = ignored.mask(&lengths);
     let tree = SuffixTree::build(sequences);

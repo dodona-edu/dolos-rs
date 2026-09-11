@@ -45,6 +45,11 @@ pub mod suffixtree_test_utils {
     use crate::Symbol;
     use crate::suffixtree::tree::SuffixTree;
 
+    /// One symbol per byte of `s`.
+    pub fn str_to_symbols(s: &str) -> Vec<Symbol> {
+        s.as_bytes().iter().map(|&b| b as Symbol).collect()
+    }
+
     fn search_pattern(
         tree: &SuffixTree,
         sequences: &[Vec<Symbol>],
@@ -119,9 +124,8 @@ mod tests_build_single_sequence {
     use crate::Symbol;
     use crate::suffixtree::node::{Node, Range};
     use crate::suffixtree::tree::SuffixTree;
-    use crate::suffixtree::tree::suffixtree_test_utils::test_all_substrings;
+    use crate::suffixtree::tree::suffixtree_test_utils::{str_to_symbols, test_all_substrings};
     use crate::suffixtree::types::SENTINEL_SYMBOL;
-    use crate::test_utils::str_to_symbols;
     use std::collections::{HashMap, HashSet};
 
     #[test]
@@ -181,9 +185,8 @@ mod tests_build_multiple_sequences {
     use crate::Symbol;
     use crate::suffixtree::node::{Node, Range};
     use crate::suffixtree::tree::SuffixTree;
-    use crate::suffixtree::tree::suffixtree_test_utils::test_all_substrings;
+    use crate::suffixtree::tree::suffixtree_test_utils::{str_to_symbols, test_all_substrings};
     use crate::suffixtree::types::SENTINEL_SYMBOL;
-    use crate::test_utils::str_to_symbols;
     use rand::{RngExt, SeedableRng, rngs::StdRng};
     use std::collections::{HashMap, HashSet};
 
@@ -282,8 +285,8 @@ mod tests_analysis {
     use crate::Symbol;
     use crate::ignore::IgnoredPositions;
     use crate::suffixtree::tree::SuffixTree;
+    use crate::suffixtree::tree::suffixtree_test_utils::str_to_symbols;
     use crate::suffixtree::types::AnalysisResult;
-    use crate::test_utils::str_to_symbols;
     use std::collections::HashSet;
 
     /// Analyze `inputs` (one symbol per byte), ignoring every symbol that
