@@ -244,7 +244,7 @@ mod tests {
     use crate::suffixtree::build_cursor::BuildCursor;
     use crate::suffixtree::node::{Node, Range};
     use crate::suffixtree::tree::SuffixTree;
-    use crate::test_utils::str_to_symbols;
+    use crate::suffixtree::tree::suffixtree_test_utils::str_to_symbols;
 
     #[test]
     fn test_split_edge() {

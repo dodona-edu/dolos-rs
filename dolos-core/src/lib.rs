@@ -14,8 +14,6 @@ mod analysis;
 mod collections;
 mod ignore;
 mod suffixtree;
-#[cfg(test)]
-mod test_utils;
 
 pub use analysis::{AnalysisOptions, analyze};
 pub use collections::pair_array::PairArray;
