@@ -1,5 +1,5 @@
 use crate::Symbol;
-use crate::ignore::IgnoredPositions;
+use crate::ignore::{IgnoreMask, IgnoredPositions};
 use crate::suffixtree::{AnalysisResult, SENTINEL_SYMBOL, SuffixTree};
 
 /// Options controlling an [`analyze`] run.
@@ -14,8 +14,7 @@ pub struct AnalysisOptions {
 /// maximal exact matches.
 ///
 /// Matches are split at the positions `ignored` marks, and those positions are
-/// left out of the totals. Which positions those are is up to the caller;
-/// pass [`IgnoredPositions::none`] to ignore nothing.
+/// left out of the totals. Which positions those are is up to the caller.
 pub fn analyze(
     sequences: &[Vec<Symbol>],
     ignored: &IgnoredPositions,
@@ -34,7 +33,7 @@ pub fn analyze(
     );
 
     let lengths: Vec<usize> = sequences.iter().map(Vec::len).collect();
-    let mask = ignored.mask(&lengths);
+    let mask = IgnoreMask::new(ignored, &lengths);
     let tree = SuffixTree::build(sequences);
 
     tree.analyze(
