@@ -21,6 +21,12 @@ impl<'a> MetadataRow<'a> {
 ///
 /// The last three columns hold the data needed to run the analysis again without the source
 /// files. They are always present and stay empty unless `--include-analysis-data` was given.
+/// Their JSON formats are:
+/// - `fingerprints`: one hash per fingerprint, `[hash,…]`.
+/// - `fingerprint_regions`: four numbers per fingerprint, in the order
+///   `start row, start column, end row, end column`.
+/// - `ignored_intervals`: one half-open `[start,end)` fingerprint interval per
+///   ignored run, `[[start,end],…]`.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
     id: usize,
@@ -55,7 +61,7 @@ impl<'a> FileRow<'a> {
                 json_array(
                     data.ignored
                         .iter()
-                        .map(|r| format!("[{},{}]", r.start, r.len())),
+                        .map(|r| format!("[{},{}]", r.start, r.end)),
                 )
             }),
         }

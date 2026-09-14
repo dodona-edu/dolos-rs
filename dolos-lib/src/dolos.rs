@@ -83,9 +83,8 @@ impl Dolos {
 
     /// Tokenize a source file and register it as a regular file in the analysis.
     ///
-    /// The path and content are added to `self.paths` and `self.contents`, the
-    /// fingerprints to `self.hashes`, and the locations to `self.locations`
-    /// when they are kept.
+    /// The path and content are added to `self.files`, the fingerprints to
+    /// `self.hashes`, and the locations to `self.locations` when they are kept.
     fn add_file(&mut self, base_dir: &Path, relative: &Path) -> Result<()> {
         let content = std::fs::read_to_string(base_dir.join(relative))?;
         let (hashes, locations) = self.fingerprint(&content, self.locations.is_some());
