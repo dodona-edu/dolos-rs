@@ -1,8 +1,9 @@
 use crate::views::csv::report_dir::ReportDirectory;
 use crate::views::csv::table::{Column, write_table};
 use crate::views::view::View;
-use dolos::{File, Fragment, Pair, Point, Report};
+use dolos::{AnalysisData, File, Fragment, Pair, Point, Region, Report};
 use std::io::Result;
+use std::ops::Range;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -62,12 +63,49 @@ fn metadata_columns() -> [Column<MetadataProperty>; 2] {
     ]
 }
 
-fn file_columns() -> [Column<Rc<File>>; 3] {
+/// The columns of `files.csv`.
+///
+/// The last three are empty unless `--include-analysis-data` was given:
+/// - `fingerprints`: one hash per fingerprint, `[hash,...]`.
+/// - `fingerprint_regions`: `[start_row,start_col,end_row,end_col]` per fingerprint.
+/// - `ignored_intervals`: one half-open `[start,end)` interval per ignored run.
+fn file_columns() -> [Column<Rc<File>>; 6] {
     [
-        Column::new("id", |f| f.id.to_string()),
-        Column::new("path", |f| f.relative_path.display().to_string()),
-        Column::new("content", |f| f.content.clone()),
+        Column::new("id", |file| file.id.to_string()),
+        Column::new("path", |file| file.relative_path.display().to_string()),
+        Column::new("content", |file| file.content.clone()),
+        Column::new("fingerprints", |file| {
+            analysis(file, |d| bracketed(&d.fingerprints, usize::to_string))
+        }),
+        Column::new("fingerprint_regions", |file| {
+            analysis(file, |d| bracketed(&d.regions, region_to_string))
+        }),
+        Column::new("ignored_intervals", |file| {
+            analysis(file, |d| bracketed(&d.ignored, range_to_string))
+        }),
     ]
+}
+
+fn bracketed<T>(items: &[T], fmt: impl Fn(&T) -> String) -> String {
+    format!("[{}]", items.iter().map(fmt).collect::<Vec<_>>().join(","))
+}
+
+fn analysis(file: &File, fmt: impl Fn(&AnalysisData) -> String) -> String {
+    file.analysis_data.as_ref().map(fmt).unwrap_or_default()
+}
+
+fn range_to_string(range: &Range<usize>) -> String {
+    format!("[{},{}]", range.start, range.end)
+}
+
+fn region_to_string(region: &Region) -> String {
+    format!(
+        "[{},{},{},{}]",
+        region.start_point.row,
+        region.start_point.column,
+        region.end_point.row,
+        region.end_point.column,
+    )
 }
 
 fn pair_columns() -> [Column<Pair>; 10] {

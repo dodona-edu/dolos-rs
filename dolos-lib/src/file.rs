@@ -1,5 +1,8 @@
+use crate::winnowing::fingerprints::Fingerprint;
+use crate::winnowing::region::Region;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::ops::Range;
 use std::path::PathBuf;
 use tree_sitter_grammars::{Language, guess_grammar_from_path};
 
@@ -9,6 +12,21 @@ pub struct File {
     pub relative_path: PathBuf,
     /// Full source text of the file.
     pub content: String,
+    /// The data needed to rerun the analysis for this file, present when
+    /// `include_analysis_data` is set.
+    pub analysis_data: Option<AnalysisData>,
+}
+
+/// Everything the analysis engine needs for one file, exported so that a pair
+/// can be analysed again from the report alone.
+#[derive(Debug, Clone)]
+pub struct AnalysisData {
+    /// The file's winnowed fingerprint sequence.
+    pub fingerprints: Vec<Fingerprint>,
+    /// The source region of each fingerprint (same length as `fingerprints`).
+    pub regions: Vec<Region>,
+    /// The ignored fingerprint positions, as half-open intervals.
+    pub ignored: Vec<Range<usize>>,
 }
 
 impl Hash for File {
