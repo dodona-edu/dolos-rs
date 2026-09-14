@@ -66,7 +66,12 @@ fn metadata_columns() -> [Column<MetadataProperty>; 2] {
 ///
 /// The last three are always present. They hold the data needed to run the
 /// analysis again without the source files, and stay empty unless
-/// `--include-analysis-data` was given.
+/// `--include-analysis-data` was given. Their JSON formats are:
+/// - `fingerprints`: one hash per fingerprint, `[hash,…]`.
+/// - `fingerprint_regions`: four numbers per fingerprint, in the order
+///   `start row, start column, end row, end column`.
+/// - `ignored_intervals`: one half-open `[start,end)` fingerprint interval per
+///   ignored run, `[[start,end],…]`.
 fn file_columns() -> [Column<Rc<File>>; 6] {
     [
         Column::new("id", |f| f.id.to_string()),
@@ -87,7 +92,7 @@ fn file_columns() -> [Column<Rc<File>>; 6] {
                 json_array(
                     data.ignored
                         .iter()
-                        .map(|r| format!("[{},{}]", r.start, r.len())),
+                        .map(|r| format!("[{},{}]", r.start, r.end)),
                 )
             })
         }),
