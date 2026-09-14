@@ -94,13 +94,16 @@ fn analysis_data_columns_hold_numbers() {
     let tmp = TempDir::new().unwrap();
     let report_dir = csv_report(&tmp, &["--include-analysis-data"]);
 
+    // The fingerprint count of each fixture, with the default kgram and window.
+    let expected = [(SAMPLE1, 96), (SAMPLE2, 108)];
+
     let count = |cell: &str| cell.trim_matches(['[', ']']).split(',').count();
 
     let rows = read_rows(&report_dir.join("files.csv"));
-    assert_eq!(rows.len(), 2);
-    for row in rows {
-        let fingerprints = count(&row[3]);
-        assert!(fingerprints > 0);
+    assert_eq!(rows.len(), expected.len());
+    for (row, (path, fingerprints)) in rows.iter().zip(expected) {
+        assert_eq!(&row[1], path);
+        assert_eq!(count(&row[3]), fingerprints);
         assert_eq!(count(&row[4]), 4 * fingerprints);
         // Nothing is ignored without a template or a frequency cap.
         assert_eq!(&row[5], "[]");
