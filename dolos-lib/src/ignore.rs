@@ -61,7 +61,6 @@ pub fn classify(
         .iter()
         .map(|sequence| ignored_ranges(sequence, &entries))
         .collect();
-
     IgnoredPositions::new(per_file)
 }
 
@@ -73,16 +72,15 @@ fn ignored_ranges(
     let mut ranges: Vec<Range<usize>> = Vec::new();
 
     for (position, fingerprint) in sequence.iter().enumerate() {
-        if !entries
+        if entries
             .get(fingerprint)
             .is_some_and(|entry| entry.is_ignored)
         {
-            continue;
-        }
-        // Extend the previous range when this position continues it.
-        match ranges.last_mut() {
-            Some(last) if last.end == position => last.end = position + 1,
-            _ => ranges.push(position..position + 1),
+            // Extend the previous range when this position continues it.
+            match ranges.last_mut() {
+                Some(last) if last.end == position => last.end = position + 1,
+                _ => ranges.push(position..position + 1),
+            }
         }
     }
 

@@ -283,7 +283,7 @@ mod tests_build_multiple_sequences {
 #[cfg(test)]
 mod tests_analysis {
     use crate::Symbol;
-    use crate::ignore::IgnoredPositions;
+    use crate::ignore::{IgnoreMask, IgnoredPositions};
     use crate::suffixtree::tree::SuffixTree;
     use crate::suffixtree::tree::suffixtree_test_utils::str_to_symbols;
     use crate::suffixtree::types::AnalysisResult;
@@ -312,7 +312,7 @@ mod tests_analysis {
 
         SuffixTree::build(&sequences).analyze(
             &sequences,
-            &ignored.mask(&lengths),
+            &IgnoreMask::new(&ignored, &lengths),
             min_match_length,
             true,
         )
