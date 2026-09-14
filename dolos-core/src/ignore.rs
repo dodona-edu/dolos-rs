@@ -19,28 +19,28 @@ use std::ops::Range;
 pub struct IgnoredPositions {
     /// The ignored ranges of the sequence with the same index. Every range must
     /// be non-empty and stay within the sequence it indexes.
-    per_sequence: Vec<Vec<Range<usize>>>,
+    ranges: Vec<Vec<Range<usize>>>,
 }
 
 impl IgnoredPositions {
     /// Ignore the given ranges, one list per sequence.
     pub fn new(per_sequence: Vec<Vec<Range<usize>>>) -> Self {
-        Self { per_sequence }
+        Self { ranges: per_sequence }
     }
 
     /// The number of sequences the ranges cover. `0` when nothing is ignored.
     pub(crate) fn sequence_count(&self) -> usize {
-        self.per_sequence.len()
+        self.ranges.len()
     }
 
-    /// The ignored ranges of `sequence`, in ascending order.
-    pub fn ranges(&self, sequence: usize) -> &[Range<usize>] {
-        self.per_sequence.get(sequence).map_or(&[], Vec::as_slice)
+    /// The ignored ranges of every sequence, in order.
+    pub fn ranges(self) -> Vec<Vec<Range<usize>>> {
+        self.ranges
     }
 
     /// Every ignored range, paired with the index of its sequence.
     pub(crate) fn iter(&self) -> impl Iterator<Item = (usize, &Vec<Range<usize>>)> {
-        self.per_sequence.iter().enumerate()
+        self.ranges.iter().enumerate()
     }
 }
 
