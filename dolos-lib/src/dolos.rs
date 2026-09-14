@@ -80,9 +80,8 @@ impl Dolos {
 
     /// Tokenize a source file and register it as a regular file in the analysis.
     ///
-    /// The path and content are added to `self.paths` and `self.contents`, the
-    /// fingerprints to `self.hashes`, and the locations to `self.locations`
-    /// when they are kept.
+    /// The path and content are added to `self.files`, the fingerprints to
+    /// `self.hashes`, and the locations to `self.locations` when they are kept.
     fn add_file(&mut self, base_dir: &Path, relative: &Path) -> Result<()> {
         // Only enforce the language-extension match when the language was
         // auto-detected.  If the user explicitly specified the language, they
