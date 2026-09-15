@@ -6,5 +6,32 @@ description = "The computational core of Dolos. It finds maximal matches between
 repository = "https://github.com/dodona-edu/dolos-rs"
 license = "MIT"
 
+[lib]
+# cdylib for the wasm-pack build, rlib so dolos-lib keeps linking it normally.
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# Off by default: a normal build pulls none of the dependencies below.
+wasm = ["dep:serde", "dep:serde-wasm-bindgen", "dep:tsify", "dep:wasm-bindgen"]
+
+[dependencies]
+serde = { version = "1.0.228", features = ["derive"], optional = true }
+serde-wasm-bindgen = { version = "0.6.5", optional = true }
+tsify = { version = "0.5.8", default-features = false, features = ["js"], optional = true }
+wasm-bindgen = { version = "0.2.128", optional = true }
+
 [dev-dependencies]
 rand = "0.10.1"
+
+[package.metadata.wasm-pack.profile.release]
+# wasm-pack's bundled wasm-opt rejects the bulk-memory instructions rustc emits
+# unless every feature is named here.
+wasm-opt = [
+    "-O",
+    "--enable-bulk-memory",
+    "--enable-nontrapping-float-to-int",
+    "--enable-reference-types",
+    "--enable-mutable-globals",
+    "--enable-sign-ext",
+    "--enable-multivalue",
+]
