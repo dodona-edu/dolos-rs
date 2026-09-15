@@ -6,7 +6,6 @@
 //! both what the analysis needs and what the report exports.
 
 use crate::winnowing::fingerprints::Fingerprint;
-use dolos_core::IgnoredPositions;
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -33,7 +32,7 @@ pub fn classify(
     sequences: &[Vec<Fingerprint>],
     template: &[Vec<Fingerprint>],
     max_file_count: Option<usize>,
-) -> IgnoredPositions {
+) -> Vec<Vec<Range<usize>>> {
     let mut entries: HashMap<Fingerprint, Entry> = HashMap::new();
 
     // insert template entries
@@ -57,11 +56,10 @@ pub fn classify(
         }
     }
 
-    let per_file = sequences
+    sequences
         .iter()
         .map(|sequence| ignored_ranges(sequence, &entries))
-        .collect();
-    IgnoredPositions::new(per_file)
+        .collect()
 }
 
 /// The maximal ranges of `sequence` whose fingerprints are ignored.
@@ -100,9 +98,10 @@ mod tests {
     }
 
     /// The ignored positions of every file, as a plain nested `Vec`.
-    fn marked(ignored: &IgnoredPositions, count: usize) -> Vec<Vec<usize>> {
-        (0..count)
-            .map(|file| ignored.ranges(file).iter().flat_map(Clone::clone).collect())
+    fn marked(ignored: Vec<Vec<Range<usize>>>) -> Vec<Vec<usize>> {
+        ignored
+            .iter()
+            .map(|ranges| ranges.iter().flat_map(Clone::clone).collect())
             .collect()
     }
 
@@ -112,17 +111,14 @@ mod tests {
     fn a_fingerprint_in_at_most_max_files_is_kept() {
         let files = seqs(&["XA", "XB", "YC", "YD"]);
         let ignored = classify(&files, &[], Some(2));
-        assert!(marked(&ignored, files.len()).iter().all(Vec::is_empty));
+        assert!(marked(ignored).iter().all(Vec::is_empty));
     }
 
     #[test]
     fn a_fingerprint_in_more_than_max_files_is_ignored() {
         let files = seqs(&["XA", "XB", "XC", "YD"]);
         let ignored = classify(&files, &[], Some(2));
-        assert_eq!(
-            marked(&ignored, files.len()),
-            vec![vec![0], vec![0], vec![0], vec![]]
-        );
+        assert_eq!(marked(ignored), vec![vec![0], vec![0], vec![0], vec![]]);
     }
 
     // ── Template ───────────────────────────────────────────────────
@@ -133,14 +129,14 @@ mod tests {
         // the template and in the input alike, change nothing.
         let files = seqs(&["ZZA", "B"]);
         let ignored = classify(&files, &seqs(&["Z"]), None);
-        assert_eq!(marked(&ignored, files.len()), vec![vec![0, 1], vec![]]);
+        assert_eq!(marked(ignored), vec![vec![0, 1], vec![]]);
     }
 
     #[test]
     fn a_template_that_matches_nothing_ignores_nothing() {
         let files = seqs(&["ABC", "ABC"]);
         let ignored = classify(&files, &seqs(&["Z"]), None);
-        assert!(marked(&ignored, files.len()).iter().all(Vec::is_empty));
+        assert!(marked(ignored).iter().all(Vec::is_empty));
     }
 
     // ── Shapes ────────────────────────────────────────────────────────
@@ -150,20 +146,20 @@ mod tests {
     fn ignored_positions_are_merged_into_maximal_ranges() {
         let files = seqs(&["ABXXCDX", "AB"]);
         let ignored = classify(&files, &seqs(&["X"]), None);
-        assert_eq!(ignored.ranges(0), [2..4, 6..7]);
+        assert_eq!(ignored[0], [2..4, 6..7]);
     }
 
     #[test]
     fn empty_sequences_are_handled() {
         let files = seqs(&["", "AB", ""]);
         let ignored = classify(&files, &seqs(&["A"]), None);
-        assert_eq!(marked(&ignored, files.len()), vec![vec![], vec![0], vec![]]);
+        assert_eq!(marked(ignored), vec![vec![], vec![0], vec![]]);
     }
 
     #[test]
     fn no_input_at_all_is_handled() {
         // A template without a single input file marks nothing.
         let ignored = classify(&[], &seqs(&["ABC"]), Some(1));
-        assert!(ignored.ranges(0).is_empty());
+        assert!(ignored.is_empty());
     }
 }
