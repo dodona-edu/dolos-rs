@@ -32,9 +32,13 @@ impl StartPosition {
 /// A maximal exact match between two positions in (possibly different) sequences.
 ///
 /// `left_start` and `right_start` are offsets into the left (smaller-index)
-/// and right (larger-index) sequence respectively. The owning [`PairArray`]
-/// tracks *which* sequences the pair refers to.
+/// and right (larger-index) sequence respectively.
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(serde::Serialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct Match {
     /// Start offset in the left sequence.
     pub left_start: usize,
@@ -46,6 +50,11 @@ pub struct Match {
 
 /// Per-pair metrics produced by the suffix-tree analysis.
 #[derive(Debug, Clone, Default, PartialEq)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(serde::Serialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct PairMetrics {
     /// Jaccard-style similarity: `(overlap_left + overlap_right) / (total_left + total_right)`.
     pub similarity: f64,
