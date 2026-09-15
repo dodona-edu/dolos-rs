@@ -56,14 +56,16 @@ impl<'a> MatchCollector<'a> {
             return;
         }
 
-        // Only `sp1`'s mask is walked: the two sides of an exact match hold
-        // equal values, so they are ignored at the same offsets.
-        for run in self
-            .ignored
-            .runs(sp1.sequence_index, sp1.start..sp1.start + length)
-        {
-            let delta = run.start - sp1.start;
-            self.record_run(&sp1.shifted(delta), &sp2.shifted(delta), run.len());
+        // Both masks are walked: the caller may ignore different positions in
+        // each sequence, so a run is usable only where neither side is ignored.
+        for run in self.ignored.runs_pair(
+            sp1.sequence_index,
+            sp1.start,
+            sp2.sequence_index,
+            sp2.start,
+            length,
+        ) {
+            self.record_run(&sp1.shifted(run.start), &sp2.shifted(run.start), run.len());
         }
     }
 

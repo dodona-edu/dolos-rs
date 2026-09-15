@@ -177,6 +177,9 @@ impl<'a> MaximalMatchAnalyzer<'a> {
         collector: &mut MatchCollector,
     ) -> Vec<LeftMap> {
         match &node.children {
+            // The root of a tree built from no sequences is neither a leaf nor
+            // an internal node, so there is nothing to walk.
+            None if node.sequence_indices.is_none() => Vec::new(),
             None => self.create_leaf_maps(node, node_depth),
             Some(children) => {
                 let child_indices: Vec<usize> = children.values().copied().collect();

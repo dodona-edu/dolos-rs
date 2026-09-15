@@ -15,7 +15,6 @@ mod collections;
 mod ignore;
 mod suffixtree;
 
-pub use analysis::{AnalysisOptions, analyze};
+pub use analysis::{AnalysisOptions, InputError, analyze, check};
 pub use collections::pair_array::PairArray;
-pub use ignore::IgnoredPositions;
 pub use suffixtree::{AnalysisResult, Match, PairMetrics};
