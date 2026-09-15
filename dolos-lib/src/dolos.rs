@@ -137,7 +137,9 @@ impl Dolos {
             min_match_length: self.metadata.min_length_match,
             keep_matches: self.metadata.include_fragments,
         };
-        let result = dolos_core::analyze(&self.hashes, &ignored, &options);
+        let result = dolos_core::analyze(&self.hashes, Some(&ignored), &options).expect(
+            "the fingerprints are hashed below the sentinel and classify indexes its own input",
+        );
         Report::new(result, self.files, self.locations, self.metadata)
     }
 }
