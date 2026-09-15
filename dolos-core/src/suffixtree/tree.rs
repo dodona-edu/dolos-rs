@@ -283,7 +283,7 @@ mod tests_build_multiple_sequences {
 #[cfg(test)]
 mod tests_analysis {
     use crate::Symbol;
-    use crate::ignore::{IgnoreMask, IgnoredPositions};
+    use crate::ignore::IgnoreMask;
     use crate::suffixtree::tree::SuffixTree;
     use crate::suffixtree::tree::suffixtree_test_utils::str_to_symbols;
     use crate::suffixtree::types::AnalysisResult;
@@ -295,19 +295,17 @@ mod tests_analysis {
         let sequences: Vec<Vec<Symbol>> = inputs.iter().map(|s| str_to_symbols(s)).collect();
         let template: HashSet<Symbol> = template.iter().flat_map(|s| str_to_symbols(s)).collect();
 
-        let ignored = IgnoredPositions::new(
-            sequences
-                .iter()
-                .map(|sequence| {
-                    sequence
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, symbol)| template.contains(symbol))
-                        .map(|(position, _)| position..position + 1)
-                        .collect()
-                })
-                .collect(),
-        );
+        let ignored: Vec<Vec<std::ops::Range<usize>>> = sequences
+            .iter()
+            .map(|sequence| {
+                sequence
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, symbol)| template.contains(symbol))
+                    .map(|(position, _)| position..position + 1)
+                    .collect()
+            })
+            .collect();
         let lengths: Vec<usize> = sequences.iter().map(Vec::len).collect();
 
         SuffixTree::build(&sequences).analyze(
