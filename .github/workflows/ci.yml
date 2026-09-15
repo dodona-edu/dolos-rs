@@ -39,7 +39,7 @@ jobs:
       - run: rustup update stable && rustup default stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --check
-      - run: cargo clippy --features all-languages -- -D warnings
+      - run: cargo clippy --features all-languages,wasm --all-targets -- -D warnings
 
   test:
     name: "test 🧪"
@@ -56,3 +56,21 @@ jobs:
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --verbose --features all-languages
+
+  wasm:
+    name: "wasm 🕸"
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: rustup update stable && rustup default stable
+      - run: rustup target add wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - run: cargo test -p dolos-core --features wasm
+      - run: cargo clippy --target wasm32-unknown-unknown -p dolos-core --features wasm -- -D warnings
+      - run: wasm-pack build dolos-core --target bundler --release --scope dodona -- --features wasm
+      - run: wasm-pack build dolos-core --target nodejs --out-dir pkg-node --release -- --features wasm
+      - run: node dolos-core/tests/smoke.mjs
