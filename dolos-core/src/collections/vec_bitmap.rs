@@ -1,5 +1,6 @@
 use crate::collections::bit_region::{BitRegion, BitRegionMut};
 use crate::collections::bit_vec::BitVec;
+use std::ops::Range;
 
 /// A flat bitmap storing one independent bit-vector per indexed item.
 ///
@@ -54,6 +55,66 @@ impl VecBitmap {
         self.buf
             .region_mut(self.word_bases[item], self.lengths[item])
     }
+
+    /// The maximal runs of `item` within `range`, in ascending order. `bit`
+    /// selects which value the runs hold. A bit of the other value acts as a
+    /// barrier, so no run spans one.
+    pub fn runs(
+        &self,
+        item: usize,
+        range: Range<usize>,
+        bit: bool,
+    ) -> impl Iterator<Item = Range<usize>> {
+        let bits = self.item(item);
+        let Range { mut start, end } = range;
+
+        std::iter::from_fn(move || {
+            let run_start = bits.next_bit(start, end, bit)?;
+            let run_end = bits.next_bit(run_start, end, !bit).unwrap_or(end);
+
+            start = run_end;
+            Some(run_start..run_end)
+        })
+    }
+
+    /// The runs where `left` and `right` both hold `bit` over `length`
+    /// positions, as offsets from `left_start` and `right_start`.
+    pub fn shared_runs(
+        &self,
+        left: usize,
+        left_start: usize,
+        right: usize,
+        right_start: usize,
+        length: usize,
+        bit: bool,
+    ) -> impl Iterator<Item = Range<usize>> {
+        // Both sides are walked in offsets from their own start, so the two run
+        // lists can be intersected directly.
+        let offsets = |run: Range<usize>, start: usize| run.start - start..run.end - start;
+        let mut left_runs = self.runs(left, left_start..left_start + length, bit);
+        let mut right_runs = self.runs(right, right_start..right_start + length, bit);
+        let mut current_left = left_runs.next().map(|run| offsets(run, left_start));
+        let mut current_right = right_runs.next().map(|run| offsets(run, right_start));
+
+        std::iter::from_fn(move || {
+            loop {
+                let (left_run, right_run) = (current_left.clone()?, current_right.clone()?);
+                let overlap = left_run.start.max(right_run.start)..left_run.end.min(right_run.end);
+
+                // Advance the run that ends first. The other one may still
+                // overlap the run that follows it.
+                if left_run.end <= right_run.end {
+                    current_left = left_runs.next().map(|run| offsets(run, left_start));
+                } else {
+                    current_right = right_runs.next().map(|run| offsets(run, right_start));
+                }
+
+                if !overlap.is_empty() {
+                    return Some(overlap);
+                }
+            }
+        })
+    }
 }
 
 #[cfg(test)]
@@ -93,6 +154,40 @@ mod tests {
             );
             assert_eq!(item.count_zeros(), length - length / 3);
         }
+    }
+
+    #[test]
+    fn runs_stop_at_a_bit_of_the_other_value() {
+        let mut bm = VecBitmap::new(&[7, 2]);
+        bm.item_mut(0).mark(2, 1);
+        bm.item_mut(0).mark(5, 2);
+
+        assert_eq!(
+            bm.runs(0, 0..7, false).collect::<Vec<_>>(),
+            vec![0..2, 3..5]
+        );
+        assert_eq!(bm.runs(0, 0..7, true).collect::<Vec<_>>(), vec![2..3, 5..7]);
+        // A range may start inside a run of the other value.
+        assert_eq!(bm.runs(0, 2..4, false).collect::<Vec<_>>(), vec![3..4]);
+        // An item without a single marked position is one run.
+        assert_eq!(bm.runs(1, 0..2, false).collect::<Vec<_>>(), vec![0..2]);
+        assert!(bm.runs(1, 0..2, true).next().is_none());
+        // An empty range yields no run at all.
+        assert!(bm.runs(1, 1..1, false).next().is_none());
+    }
+
+    #[test]
+    fn shared_runs_intersect_both_items() {
+        let mut bm = VecBitmap::new(&[10, 10]);
+        bm.item_mut(0).mark(3, 1);
+        bm.item_mut(1).mark(6, 1);
+
+        // The marked bit of item 0 lands on offset 1, the one of item 1 on
+        // offset 5. Both cut the shared range.
+        assert_eq!(
+            bm.shared_runs(0, 2, 1, 1, 8, false).collect::<Vec<_>>(),
+            vec![0..1, 2..5, 6..8]
+        );
     }
 
     #[test]
