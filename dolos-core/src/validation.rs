@@ -2,91 +2,13 @@
 //!
 //! [`validate_input`] is the single statement of
 //! [`analyze`](crate::analyze)'s contract. `analyze` runs it before it builds
-//! anything and returns its [`InputError`], so the algorithm never sees an
-//! input it cannot handle.
-//!
-//! Each rule is one named function over [`Input`]. [`RULES`] lists them in the
-//! order they report, so adding a rule means writing it and naming it there.
+//! anything, so the algorithm never sees an input it cannot handle.
 
 use crate::Symbol;
 use crate::analysis::AnalysisOptions;
 use crate::suffixtree::SENTINEL_SYMBOL;
-use std::fmt;
+use std::io::{Error, ErrorKind, Result};
 use std::ops::Range;
-
-/// Why an analysis cannot accept its input.
-#[derive(Debug, PartialEq, Eq)]
-pub enum InputError {
-    /// The analysis has fewer than the two sequences a pair needs.
-    TooFewSequences { given: usize },
-    /// A sequence holds the symbol the tree reserves as its end-of-sequence
-    /// sentinel.
-    ReservedSymbol { sequence: usize, position: usize },
-    /// [`AnalysisOptions::min_match_length`] is `0`.
-    MinMatchLengthZero,
-    /// The ignored ranges cover a different number of sequences than the
-    /// analysis has.
-    IgnoredSequenceCount { given: usize, expected: usize },
-    /// An ignored range starts after it ends.
-    IgnoredRangeOrder { sequence: usize, range: Range<usize> },
-    /// An ignored range reaches past the end of its sequence.
-    IgnoredRangeOutOfBounds { sequence: usize, range: Range<usize>, length: usize },
-}
-
-impl fmt::Display for InputError {
-    fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Self::TooFewSequences { given } => write!(
-                fmt,
-                "the analysis needs at least 2 sequences to form a pair, it has {given}"
-            ),
-            Self::ReservedSymbol { sequence, position } => write!(
-                fmt,
-                "position {position} of sequence {sequence} holds the reserved end-of-sequence symbol"
-            ),
-            Self::MinMatchLengthZero => write!(fmt, "the minimum match length must be at least 1"),
-            Self::IgnoredSequenceCount { given, expected } => write!(
-                fmt,
-                "the ignored positions cover {given} sequences, the analysis has {expected}"
-            ),
-            Self::IgnoredRangeOrder { sequence, range } => write!(
-                fmt,
-                "ignored range {range:?} of sequence {sequence} starts after it ends"
-            ),
-            Self::IgnoredRangeOutOfBounds { sequence, range, length } => write!(
-                fmt,
-                "ignored range {range:?} of sequence {sequence} reaches past its length {length}"
-            ),
-        }
-    }
-}
-
-impl std::error::Error for InputError {}
-
-/// The input of one analysis, borrowed for the length of a
-/// [`validate_input`] call.
-///
-/// It exists so every rule has the same shape and can go in [`RULES`].
-struct Input<'a> {
-    /// The sequences to compare.
-    sequences: &'a [Vec<Symbol>],
-    /// The ignored ranges of each sequence, or nothing at all.
-    ignored: Option<&'a [Vec<Range<usize>>]>,
-    /// The options of the run.
-    options: &'a AnalysisOptions,
-}
-
-/// One rule the input of an analysis must satisfy.
-type Rule = fn(&Input) -> Result<(), InputError>;
-
-/// Every rule, in the order they report.
-const RULES: &[Rule] = &[
-    sequences_form_at_least_one_pair,
-    match_length_is_positive,
-    sequences_leave_the_sentinel_free,
-    ignored_covers_every_sequence,
-    ignored_ranges_stay_inside_their_sequence,
-];
 
 /// Check that [`analyze`](crate::analyze) accepts this input.
 ///
@@ -97,39 +19,51 @@ const RULES: &[Rule] = &[
 ///
 /// # Errors
 ///
-/// Returns the first rule that the input breaks.
+/// Returns the first rule that the input breaks, as an
+/// [`ErrorKind::InvalidInput`] error.
 pub(crate) fn validate_input(
     sequences: &[Vec<Symbol>],
     ignored: Option<&[Vec<Range<usize>>]>,
     options: &AnalysisOptions,
-) -> Result<(), InputError> {
-    let input = Input { sequences, ignored, options };
-
-    RULES.iter().try_for_each(|rule| rule(&input))
+) -> Result<()> {
+    sequences_form_at_least_one_pair(sequences)?;
+    match_length_is_positive(options)?;
+    sequences_leave_the_sentinel_free(sequences)?;
+    ignored_ranges_fit_their_sequence(sequences, ignored)
 }
 
 /// The analysis reports one result per pair, and a pair needs two sequences.
-fn sequences_form_at_least_one_pair(input: &Input) -> Result<(), InputError> {
-    match input.sequences.len() {
-        given if given < 2 => Err(InputError::TooFewSequences { given }),
-        _ => Ok(()),
+fn sequences_form_at_least_one_pair(sequences: &[Vec<Symbol>]) -> Result<()> {
+    if sequences.len() < 2 {
+        let message = format!(
+            "the analysis needs at least 2 sequences to form a pair, it has {}",
+            sequences.len()
+        );
+        return Err(Error::new(ErrorKind::InvalidInput, message));
     }
+
+    Ok(())
 }
 
 /// A match of no symbols is not a match.
-fn match_length_is_positive(input: &Input) -> Result<(), InputError> {
-    match input.options.min_match_length {
-        0 => Err(InputError::MinMatchLengthZero),
-        _ => Ok(()),
+fn match_length_is_positive(options: &AnalysisOptions) -> Result<()> {
+    if options.min_match_length == 0 {
+        let message = "the minimum match length must be at least 1".to_string();
+        return Err(Error::new(ErrorKind::InvalidInput, message));
     }
+
+    Ok(())
 }
 
 /// The tree appends [`SENTINEL_SYMBOL`] to every sequence, so no input may hold
 /// it: two sequences would compare equal where they do not match.
-fn sequences_leave_the_sentinel_free(input: &Input) -> Result<(), InputError> {
-    for (sequence, symbols) in input.sequences.iter().enumerate() {
+fn sequences_leave_the_sentinel_free(sequences: &[Vec<Symbol>]) -> Result<()> {
+    for (sequence, symbols) in sequences.iter().enumerate() {
         if let Some(position) = symbols.iter().position(|&symbol| symbol == SENTINEL_SYMBOL) {
-            return Err(InputError::ReservedSymbol { sequence, position });
+            let message = format!(
+                "position {position} of sequence {sequence} holds the reserved end-of-sequence symbol"
+            );
+            return Err(Error::new(ErrorKind::InvalidInput, message));
         }
     }
 
@@ -137,39 +71,39 @@ fn sequences_leave_the_sentinel_free(input: &Input) -> Result<(), InputError> {
 }
 
 /// An ignore list indexes the sequences by position, so a partial list would
-/// silently ignore the wrong ones. `None` ignores nothing.
-fn ignored_covers_every_sequence(input: &Input) -> Result<(), InputError> {
-    let Some(ignored) = input.ignored else {
+/// silently ignore the wrong ones. A range that reaches past its sequence marks
+/// bits of the next one and underflows the totals that subtract it.
+fn ignored_ranges_fit_their_sequence(
+    sequences: &[Vec<Symbol>],
+    ignored: Option<&[Vec<Range<usize>>]>,
+) -> Result<()> {
+    let Some(ignored) = ignored else {
         return Ok(());
     };
 
-    if ignored.len() == input.sequences.len() {
-        return Ok(());
+    if ignored.len() != sequences.len() {
+        let message = format!(
+            "the ignored positions cover {} sequences, the analysis has {}",
+            ignored.len(),
+            sequences.len()
+        );
+        return Err(Error::new(ErrorKind::InvalidInput, message));
     }
 
-    Err(InputError::IgnoredSequenceCount { given: ignored.len(), expected: input.sequences.len() })
-}
-
-/// A range that reaches past its sequence marks bits of the next one and
-/// underflows the totals that subtract it.
-fn ignored_ranges_stay_inside_their_sequence(input: &Input) -> Result<(), InputError> {
-    let Some(ignored) = input.ignored else {
-        return Ok(());
-    };
-
     for (sequence, ranges) in ignored.iter().enumerate() {
-        let length = input.sequences[sequence].len();
+        let length = sequences[sequence].len();
 
         for range in ranges {
             if range.start > range.end {
-                return Err(InputError::IgnoredRangeOrder { sequence, range: range.clone() });
+                let message =
+                    format!("ignored range {range:?} of sequence {sequence} starts after it ends");
+                return Err(Error::new(ErrorKind::InvalidInput, message));
             }
             if range.end > length {
-                return Err(InputError::IgnoredRangeOutOfBounds {
-                    sequence,
-                    range: range.clone(),
-                    length,
-                });
+                let message = format!(
+                    "ignored range {range:?} of sequence {sequence} reaches past its length {length}"
+                );
+                return Err(Error::new(ErrorKind::InvalidInput, message));
             }
         }
     }
@@ -188,52 +122,51 @@ mod tests {
         AnalysisOptions { min_match_length: 1, keep_matches: true }
     }
 
+    /// The message of a rejected input, with its kind checked.
+    fn rejection(result: Result<()>) -> String {
+        let error = result.unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidInput);
+        error.to_string()
+    }
+
     /// An empty ignore list, an empty range and overlapping ranges are all legal.
     #[test]
     fn validate_input_accepts_valid_input() {
         let sequences = vec![vec![1, 2, 3, 4], vec![1, 2]];
 
-        assert_eq!(validate_input(&sequences, None, &options()), Ok(()));
-        assert_eq!(
+        assert!(validate_input(&sequences, None, &options()).is_ok());
+        assert!(
             validate_input(
                 &sequences,
                 Some(&[vec![1..1, 0..3, 2..4], vec![0..2]]),
                 &options()
-            ),
-            Ok(())
+            )
+            .is_ok()
         );
     }
 
     #[test]
     fn validate_input_rejects_fewer_than_two_sequences() {
-        assert_eq!(
-            validate_input(&[], None, &options()),
-            Err(InputError::TooFewSequences { given: 0 })
-        );
-        assert_eq!(
-            validate_input(&[vec![1, 2]], None, &options()),
-            Err(InputError::TooFewSequences { given: 1 })
-        );
+        let rejected = rejection(validate_input(&[vec![1, 2]], None, &options()));
+
+        assert!(rejected.contains("at least 2 sequences"), "{rejected}");
     }
 
     #[test]
     fn validate_input_rejects_the_reserved_sentinel() {
         let sequences = vec![vec![1, 2], vec![3, SENTINEL_SYMBOL]];
+        let rejected = rejection(validate_input(&sequences, None, &options()));
 
-        assert_eq!(
-            validate_input(&sequences, None, &options()),
-            Err(InputError::ReservedSymbol { sequence: 1, position: 1 })
-        );
+        assert!(rejected.contains("position 1 of sequence 1"), "{rejected}");
     }
 
     #[test]
     fn validate_input_rejects_a_zero_min_match_length() {
         let options = AnalysisOptions { min_match_length: 0, keep_matches: false };
+        let rejected = rejection(validate_input(&[vec![1, 2], vec![3, 4]], None, &options));
 
-        assert_eq!(
-            validate_input(&[vec![1, 2], vec![3, 4]], None, &options),
-            Err(InputError::MinMatchLengthZero)
-        );
+        assert!(rejected.contains("minimum match length"), "{rejected}");
     }
 
     /// A range that reaches past its sequence corrupts the totals, so it is
@@ -242,28 +175,30 @@ mod tests {
     fn validate_input_rejects_ignored_ranges_outside_their_sequence() {
         let sequences = vec![vec![1, 2, 3], vec![1, 2]];
 
-        assert_eq!(
-            validate_input(&sequences, Some(&[vec![0..4], vec![]]), &options()),
-            Err(InputError::IgnoredRangeOutOfBounds { sequence: 0, range: 0..4, length: 3 })
-        );
-        assert_eq!(
-            validate_input(&sequences, Some(&[vec![2..1], vec![]]), &options()),
-            Err(InputError::IgnoredRangeOrder { sequence: 0, range: 2..1 })
-        );
+        let rejected = rejection(validate_input(
+            &sequences,
+            Some(&[vec![0..4], vec![]]),
+            &options(),
+        ));
+        assert!(rejected.contains("reaches past its length 3"), "{rejected}");
+
+        let rejected = rejection(validate_input(
+            &sequences,
+            Some(&[vec![2..1], vec![]]),
+            &options(),
+        ));
+        assert!(rejected.contains("starts after it ends"), "{rejected}");
     }
 
+    /// An empty list is not the way to ignore nothing. `None` is.
     #[test]
     fn validate_input_rejects_an_ignore_list_that_covers_the_wrong_number_of_sequences() {
         let sequences = vec![vec![1, 2], vec![3, 4]];
+        let rejected = rejection(validate_input(&sequences, Some(&[]), &options()));
 
-        assert_eq!(
-            validate_input(&sequences, Some(&[vec![]]), &options()),
-            Err(InputError::IgnoredSequenceCount { given: 1, expected: 2 })
-        );
-        // An empty list is not the way to ignore nothing. `None` is.
-        assert_eq!(
-            validate_input(&sequences, Some(&[]), &options()),
-            Err(InputError::IgnoredSequenceCount { given: 0, expected: 2 })
+        assert!(
+            rejected.contains("cover 0 sequences, the analysis has 2"),
+            "{rejected}"
         );
     }
 }

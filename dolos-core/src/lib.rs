@@ -19,4 +19,3 @@ mod validation;
 pub use analysis::{AnalysisOptions, analyze};
 pub use collections::pair_array::PairArray;
 pub use suffixtree::{AnalysisResult, Match, PairMetrics};
-pub use validation::InputError;
