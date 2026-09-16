@@ -2,13 +2,16 @@ use crate::Symbol;
 use crate::collections::pair_array::PairArray;
 use crate::collections::pair_bitmap::PairBitmap;
 use crate::collections::utils::ordered_pair_with;
-use crate::ignore::IgnoreMask;
+use crate::collections::vec_bitmap::VecBitmap;
 use crate::suffixtree::types::{AnalysisResult, Match, PairMetrics, StartPosition};
 
 /// Collects and processes matches found during tree traversal.
 pub struct MatchCollector<'a> {
     /// The sequences being compared.
     sequences: &'a [Vec<Symbol>],
+    /// The set bits mark the ignored positions of each sequence. `None`
+    /// ignores nothing.
+    ignore_mask: Option<&'a VecBitmap>,
     /// Tracks the longest match length for each pair of sequences.
     longest_matches: PairArray<usize>,
     /// Bitmap tracking which positions have been covered by matches, per sequence pair.
@@ -17,8 +20,6 @@ pub struct MatchCollector<'a> {
     matches: Option<PairArray<Vec<Match>>>,
     /// Shortest run worth recording.
     min_match_length: usize,
-    /// Which positions are ignored.
-    ignored: &'a IgnoreMask,
 }
 
 impl<'a> MatchCollector<'a> {
@@ -28,7 +29,7 @@ impl<'a> MatchCollector<'a> {
     /// derived from the length of each sequence.
     pub fn new(
         sequences: &'a [Vec<Symbol>],
-        ignored: &'a IgnoreMask,
+        ignore_mask: Option<&'a VecBitmap>,
         min_match_length: usize,
         keep_matches: bool,
     ) -> Self {
@@ -36,11 +37,11 @@ impl<'a> MatchCollector<'a> {
 
         Self {
             sequences,
+            ignore_mask,
             longest_matches: PairArray::new(sequences.len(), 0),
             overlap_bitmap: PairBitmap::new(sequence_lengths.as_slice()),
             matches: keep_matches.then(|| PairArray::new(sequences.len(), Vec::new())),
             min_match_length,
-            ignored,
         }
     }
 
@@ -51,19 +52,20 @@ impl<'a> MatchCollector<'a> {
     /// deletions.
     pub fn record_match(&mut self, sp1: &StartPosition, sp2: &StartPosition, length: usize) {
         // Nothing is ignored, so the match is already a single usable run.
-        if self.ignored.is_empty() {
+        let Some(ignored) = self.ignore_mask else {
             self.record_run(sp1, sp2, length);
             return;
-        }
+        };
 
-        // Both masks are walked: the caller may ignore different positions in
-        // each sequence, so a run is usable only where neither side is ignored.
-        for run in self.ignored.runs_pair(
+        // Both sequences are walked: the caller may ignore different positions
+        // in each one, so a run is usable only where neither side is ignored.
+        for run in ignored.shared_runs(
             sp1.sequence_index,
             sp1.start,
             sp2.sequence_index,
             sp2.start,
             length,
+            false,
         ) {
             self.record_run(&sp1.shifted(run.start), &sp2.shifted(run.start), run.len());
         }
@@ -119,7 +121,12 @@ impl<'a> MatchCollector<'a> {
             .sequences
             .iter()
             .enumerate()
-            .map(|(seq, sequence)| sequence.len() - self.ignored.ignored_count(seq))
+            .map(|(seq, sequence)| {
+                sequence.len()
+                    - self
+                        .ignore_mask
+                        .map_or(0, |ignored| ignored.item(seq).count_ones())
+            })
             .collect();
 
         for i in 0..self.sequences.len() {

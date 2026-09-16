@@ -1,5 +1,5 @@
 use crate::Symbol;
-use crate::ignore::IgnoreMask;
+use crate::ignore::ignore_ranges_to_mask;
 use crate::suffixtree::{AnalysisResult, SuffixTree};
 use crate::validation::{InputError, validate_input};
 use std::ops::Range;
@@ -31,12 +31,12 @@ pub fn analyze(
     validate_input(sequences, ignored, options)?;
 
     let lengths: Vec<usize> = sequences.iter().map(Vec::len).collect();
-    let mask = IgnoreMask::new(ignored.unwrap_or_default(), &lengths);
+    let mask = ignore_ranges_to_mask(ignored.unwrap_or_default(), &lengths);
     let tree = SuffixTree::build(sequences);
 
     Ok(tree.analyze(
         sequences,
-        &mask,
+        mask.as_ref(),
         options.min_match_length,
         options.keep_matches,
     ))
