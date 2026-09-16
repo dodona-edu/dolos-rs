@@ -4,7 +4,7 @@
 //! be tested on the native target. The `#[wasm_bindgen]` block only maps their
 //! errors to [`JsError`], which exists on the wasm target alone.
 
-use crate::{AnalysisOptions, AnalysisResult, InputError, Match, PairMetrics, Symbol};
+use crate::{AnalysisOptions, AnalysisResult, Match, PairMetrics, Symbol};
 use std::fmt;
 use std::ops::Range;
 use tsify::{Ts, Tsify};
@@ -55,7 +55,7 @@ impl Analysis {
         sequences: Vec<Vec<Symbol>>,
         ignored: Option<Vec<Vec<(usize, usize)>>>,
         options: AnalysisOptions,
-    ) -> Result<Self, InputError> {
+    ) -> std::io::Result<Self> {
         let ignored: Option<Vec<Vec<Range<usize>>>> = ignored.map(|sequences| {
             sequences
                 .into_iter()
@@ -199,11 +199,9 @@ mod tests {
     #[test]
     fn run_rejects_an_invalid_input() {
         let with_sentinel = vec![vec![1, 2], vec![Symbol::MAX]];
+        let error = Analysis::run(with_sentinel, None, options(1, false)).unwrap_err();
 
-        assert_eq!(
-            Analysis::run(with_sentinel, None, options(1, false)).unwrap_err(),
-            InputError::ReservedSymbol { sequence: 1, position: 0 }
-        );
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
     }
 
     /// Both failing index shapes reach the caller as an error.
