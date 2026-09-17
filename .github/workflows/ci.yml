@@ -73,6 +73,12 @@ jobs:
       - run: cargo clippy --target wasm32-unknown-unknown -p dolos-core --features wasm -- -D warnings
       - run: wasm-pack build dolos-core --target bundler --release -- --features wasm
       - run: wasm-pack build dolos-core --target nodejs --out-dir pkg-node --release -- --features wasm
+      # Node 24 or later: `test.ts` runs as TypeScript and uses `using`.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: dolos-core/tests-typescript/package-lock.json
       - run: npm ci
         working-directory: dolos-core/tests-typescript
       - run: npm run typecheck

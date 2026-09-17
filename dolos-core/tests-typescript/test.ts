@@ -1,10 +1,6 @@
 // Check of the WebAssembly boundary itself. The Rust unit tests cover the
 // logic; this covers what only shows up once the module is loaded.
 //
-// The last group is checked twice. Each `@ts-expect-error` makes `tsc` fail if
-// the type stops being an error, and the assertion below it makes `node` fail
-// if the runtime stops rejecting the same call.
-//
 // Build first:
 //   wasm-pack build dolos-core --target nodejs --out-dir pkg-node --release -- --features wasm
 
