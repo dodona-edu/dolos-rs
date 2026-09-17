@@ -128,6 +128,15 @@ pub struct DolosArgs {
     pub min_length_match: usize,
 
     #[arg(
+        long,
+        default_value = "false",
+        long_help = "Include each file's fingerprints, their source locations and its ignored \
+                     positions in the report. This data is required to rerun only the analysis \
+                     with dolos-core, without parsing and fingerprinting the source files again."
+    )]
+    pub include_analysis_data: bool,
+
+    #[arg(
         value_enum,
         long,
         long_help = "Sort pairs by: similarity, total-overlap, or longest-fragment."
@@ -152,6 +161,7 @@ impl TryFrom<DolosArgs> for DolosConfig {
             .kgrams_in_window(a.kgrams_in_window)
             .include_comments(a.include_comments)
             .compare(a.compare)
+            .include_analysis_data(a.include_analysis_data)
             .min_length_match(a.min_length_match);
 
         if let Some(v) = a.name {
@@ -231,6 +241,28 @@ pub struct OutputArgs {
     pub open_browser: bool,
 }
 
+/// Check the argument combinations that span both `DolosArgs` and `OutputArgs`.
+///
+/// # Errors
+/// Returns an error when `--include-analysis-data` is combined with the
+/// terminal output format, which does not write that data.
+pub fn validate_args(dolos_args: &DolosArgs, output_args: &OutputArgs) -> std::io::Result<()> {
+    let terminal = matches!(
+        output_args.output_format,
+        OutputFormat::Terminal | OutputFormat::Console
+    );
+
+    if dolos_args.include_analysis_data && terminal {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "--include-analysis-data does not work with the terminal output format. \
+             Use -f csv or -f web to write the analysis data.",
+        ));
+    }
+
+    Ok(())
+}
+
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 pub struct Opts {
@@ -284,6 +316,17 @@ mod tests {
         }
     }
 
+    /// Parse options and run the cross-group argument checks.
+    ///
+    /// Panics if clap rejects the argv.
+    fn validate(extra: &[&str]) -> std::io::Result<()> {
+        match parse(extra).unwrap().command {
+            Command::Run { dolos_args, output_args, .. } => {
+                validate_args(&dolos_args, &output_args)
+            }
+        }
+    }
+
     #[test]
     fn test_default() {
         let cfg = config(&[]).unwrap();
@@ -292,6 +335,7 @@ mod tests {
         assert_eq!(cfg.min_length_match, 1);
         assert!(!cfg.include_comments);
         assert!(!cfg.compare);
+        assert!(!cfg.include_analysis_data);
         assert!(cfg.max_fingerprint_count.is_none());
         assert!(cfg.max_fingerprint_percentage.is_none());
         assert!(cfg.language.is_none());
@@ -314,6 +358,7 @@ mod tests {
             "-b", "kgrams-ascending",
             "-C",
             "-c",
+            "--include-analysis-data",
         ])
         .unwrap();
 
@@ -324,6 +369,7 @@ mod tests {
         assert_eq!(cfg.max_fingerprint_percentage, Some(0.9));
         assert!(cfg.include_comments);
         assert!(cfg.compare);
+        assert!(cfg.include_analysis_data);
         assert_eq!(cfg.name, Some("custom".to_string()));
         assert!(cfg.language.is_some());
         assert!(cfg.sort_by.is_some());
@@ -350,6 +396,20 @@ mod tests {
             Opts::try_parse_from(["dolos", "run"]).is_err(),
             "missing files should fail"
         );
+    }
+
+    #[test]
+    fn analysis_data_with_terminal_output_is_rejected() {
+        let error = validate(&["--include-analysis-data"]).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(
+            validate(&["--include-analysis-data", "-f", "console"]).is_err(),
+            "console is the terminal format under another name"
+        );
+
+        assert!(validate(&["--include-analysis-data", "-f", "csv"]).is_ok());
+        assert!(validate(&["--include-analysis-data", "-f", "web"]).is_ok());
+        assert!(validate(&[]).is_ok());
     }
 
     #[test]
