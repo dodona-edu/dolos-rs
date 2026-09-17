@@ -4,7 +4,13 @@ use crate::suffixtree::{AnalysisResult, SuffixTree};
 use crate::validation::validate_input;
 use std::ops::Range;
 
-/// Options controlling an [`analyze`] run.
+/// Options controlling an `analyze` run.
+#[derive(Debug)]
+#[cfg_attr(
+    feature = "wasm",
+    derive(serde::Deserialize, tsify::Tsify),
+    serde(rename_all = "camelCase")
+)]
 pub struct AnalysisOptions {
     /// Minimum shared substring length, in symbols. At least 1.
     pub min_match_length: usize,
@@ -12,18 +18,38 @@ pub struct AnalysisOptions {
     pub keep_matches: bool,
 }
 
-/// Build the generalized suffix tree over `sequences` and collect all pairwise
-/// maximal exact matches.
+/// Compare all sequences pairwise. The analysis finds the maximal exact matches
+/// between every pair of sequences, and derives the similarity metrics of the pair from them.
+/// With `keep_matches`, the result also holds the matches themselves.
 ///
-/// Matches are split at the positions `ignored` marks, and those positions are
-/// left out of the totals. Which positions those are is up to the caller.
-/// `ignored` holds one list of ranges per sequence, or `None` to ignore
-/// nothing.
+/// # Parameters
+///
+/// - `sequences`: the sequences to compare. There must be at least two, and
+///   none of them may contain `usize::MAX`.
+/// - `ignored`: one list of ranges per sequence, or `None` to ignore nothing.
+///   Ignored positions are excluded entirely from the analysis.
+/// - `options`: the minimum match length, and whether to keep the matches.
 ///
 /// # Errors
 ///
 /// Returns an [`ErrorKind::InvalidInput`](std::io::ErrorKind::InvalidInput)
-/// error when the input is not valid.
+/// error when the input is invalid.
+///
+/// # Examples
+///
+/// ```
+/// use dolos_core::{AnalysisOptions, analyze};
+///
+/// let sequences = vec![vec![1, 2, 3, 4], vec![9, 2, 3, 4]];
+/// let options = AnalysisOptions {
+///     min_match_length: 2,
+///     keep_matches: false,
+/// };
+///
+/// let result = analyze(&sequences, None, &options)?;
+/// assert_eq!(result.metrics.get(0, 1).longest_match, 3);
+/// # Ok::<(), std::io::Error>(())
+/// ```
 pub fn analyze(
     sequences: &[Vec<Symbol>],
     ignored: Option<&[Vec<Range<usize>>]>,
