@@ -4,7 +4,7 @@ use crate::suffixtree::{AnalysisResult, SuffixTree};
 use crate::validation::validate_input;
 use std::ops::Range;
 
-/// Options controlling an [`analyze`] run.
+/// Options controlling an `analyze` run.
 #[derive(Debug)]
 #[cfg_attr(
     feature = "wasm",
