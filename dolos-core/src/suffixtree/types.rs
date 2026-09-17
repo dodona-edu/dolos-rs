@@ -31,8 +31,8 @@ impl StartPosition {
 
 /// A maximal exact match between two positions in (possibly different) sequences.
 ///
-/// `leftStart` and `rightStart` are offsets into the left (smaller-index)
-/// and right (larger-index) sequence respectively.
+/// The start offsets are into the left (smaller-index) and the right
+/// (larger-index) sequence.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(
     feature = "wasm",
@@ -56,7 +56,8 @@ pub struct Match {
     serde(rename_all = "camelCase")
 )]
 pub struct PairMetrics {
-    /// Jaccard-style similarity: `(overlapLeft + overlapRight) / (totalLeft + totalRight)`.
+    /// Jaccard-style similarity: the sum of both overlaps divided by the sum
+    /// of both totals.
     pub similarity: f64,
     /// Number of symbols in the left sequence, excluding ignored ones.
     pub total_left: usize,
