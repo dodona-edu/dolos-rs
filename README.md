@@ -69,10 +69,11 @@ const matches = analysis.matches(0, 1);
 so an analysis over hundreds of files stays cheap. Release it with `free()`, or
 declare it with `using` as above.
 
-The result stays in the WebAssembly heap for as long as the handle lives: 700
-files of 400 fingerprints cost about 110 MB. WebAssembly memory never shrinks, so
-`free()` returns the memory to the module but not to the browser. The page keeps
-the high-water mark until it reloads.
+The result stays in the WebAssembly heap for as long as the handle lives. Over
+700 files of 400 fingerprints, one handle costs about 11 MB, and `analyze` peaks
+at about 195 MB while it builds the suffix tree. WebAssembly memory never
+shrinks, so the page keeps that peak until it reloads, and `free()` returns the
+memory to the module but not to the browser.
 
 Vite 8.1 and later need no plugin. Earlier versions need
 [`vite-plugin-wasm`](https://www.npmjs.com/package/vite-plugin-wasm) and
