@@ -77,42 +77,66 @@ impl VecBitmap {
         })
     }
 
-    /// The runs where `left` and `right` both hold `bit` over `length`
-    /// positions, as offsets from `left_start` and `right_start`.
-    pub fn shared_runs(
+    /// The maximal runs over `length` positions where neither `left` nor
+    /// `right` holds a set bit, in ascending order. The runs are offsets from
+    /// `left_start` and `right_start`.
+    ///
+    /// Both windows are read 64 bits at a time and combined with a bitwise OR,
+    /// so the two sides are walked in one pass.
+    pub fn shared_zero_runs(
         &self,
         left: usize,
         left_start: usize,
         right: usize,
         right_start: usize,
         length: usize,
-        bit: bool,
     ) -> impl Iterator<Item = Range<usize>> {
-        // Both sides are walked in offsets from their own start, so the two run
-        // lists can be intersected directly.
-        let offsets = |run: Range<usize>, start: usize| run.start - start..run.end - start;
-        let mut left_runs = self.runs(left, left_start..left_start + length, bit);
-        let mut right_runs = self.runs(right, right_start..right_start + length, bit);
-        let mut current_left = left_runs.next().map(|run| offsets(run, left_start));
-        let mut current_right = right_runs.next().map(|run| offsets(run, right_start));
+        let (left_bits, right_bits) = (self.item(left), self.item(right));
 
-        std::iter::from_fn(move || {
-            loop {
-                let (left_run, right_run) = (current_left.clone()?, current_right.clone()?);
-                let overlap = left_run.start.max(right_run.start)..left_run.end.min(right_run.end);
+        // The two windows combined over up to 64 offsets from `from` on. A set
+        // bit marks an offset that at least one side ignores. The bits above
+        // the returned count are clear.
+        let combine = move |from: usize| {
+            let count = (length - from).min(64);
+            let bits = left_bits.chunk(left_start + from, count)
+                | right_bits.chunk(right_start + from, count);
+            (bits, count)
+        };
 
-                // Advance the run that ends first. The other one may still
-                // overlap the run that follows it.
-                if left_run.end <= right_run.end {
-                    current_left = left_runs.next().map(|run| offsets(run, left_start));
-                } else {
-                    current_right = right_runs.next().map(|run| offsets(run, right_start));
+        // The first offset at or after `at` that neither side ignores. A chunk
+        // of nothing but set bits reports no offset, because the bits above
+        // `count` are clear.
+        let next_free = move |mut at: usize| {
+            while at < length {
+                let (bits, count) = combine(at);
+                let ignored = bits.trailing_ones() as usize;
+                if ignored < count {
+                    return Some(at + ignored);
                 }
-
-                if !overlap.is_empty() {
-                    return Some(overlap);
-                }
+                at += count;
             }
+            None
+        };
+
+        // The first offset at or after `at` that one of the sides ignores.
+        let next_ignored = move |mut at: usize| {
+            while at < length {
+                let (bits, count) = combine(at);
+                if bits != 0 {
+                    return Some(at + bits.trailing_zeros() as usize);
+                }
+                at += count;
+            }
+            None
+        };
+
+        let mut start = 0;
+        std::iter::from_fn(move || {
+            let run_start = next_free(start)?;
+            let run_end = next_ignored(run_start).unwrap_or(length);
+
+            start = run_end;
+            Some(run_start..run_end)
         })
     }
 }
@@ -120,6 +144,7 @@ impl VecBitmap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::{RngExt, SeedableRng, rngs::StdRng};
 
     #[test]
     fn items_are_independent() {
@@ -177,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn shared_runs_intersect_both_items() {
+    fn shared_zero_runs_cut_at_both_items() {
         let mut bm = VecBitmap::new(&[10, 10]);
         bm.item_mut(0).mark(3, 1);
         bm.item_mut(1).mark(6, 1);
@@ -185,9 +210,69 @@ mod tests {
         // The marked bit of item 0 lands on offset 1, the one of item 1 on
         // offset 5. Both cut the shared range.
         assert_eq!(
-            bm.shared_runs(0, 2, 1, 1, 8, false).collect::<Vec<_>>(),
+            bm.shared_zero_runs(0, 2, 1, 1, 8).collect::<Vec<_>>(),
             vec![0..1, 2..5, 6..8]
         );
+    }
+
+    /// The runs where neither side is set, one position at a time.
+    fn naive_shared_zero_runs(
+        bm: &VecBitmap,
+        left: usize,
+        left_start: usize,
+        right: usize,
+        right_start: usize,
+        length: usize,
+    ) -> Vec<Range<usize>> {
+        let (left_bits, right_bits) = (bm.item(left), bm.item(right));
+        let free = |offset: usize| {
+            !left_bits.get(left_start + offset) && !right_bits.get(right_start + offset)
+        };
+
+        let mut runs: Vec<Range<usize>> = Vec::new();
+        for offset in (0..length).filter(|&offset| free(offset)) {
+            match runs.last_mut() {
+                Some(run) if run.end == offset => run.end = offset + 1,
+                _ => runs.push(offset..offset + 1),
+            }
+        }
+        runs
+    }
+
+    #[test]
+    fn shared_zero_runs_match_a_position_by_position_scan() {
+        let mut rng = StdRng::seed_from_u64(20250902);
+        const BITS: usize = 512;
+        const WINDOWS: [usize; 11] = [1, 2, 63, 64, 65, 127, 128, 129, 191, 192, 193];
+
+        let mut bm = VecBitmap::new(&[BITS, BITS]);
+        for trial in 0..2000 {
+            // Alternate sparse and dense patterns so both long free runs and
+            // long ignored runs occur.
+            let threshold = if trial % 2 == 0 { 16u8 } else { 224 };
+            for item in 0..2 {
+                let mut bits = bm.item_mut(item);
+                bits.clear(0, BITS);
+                for position in (0..BITS).filter(|_| rng.random::<u8>() < threshold) {
+                    bits.mark(position, 1);
+                }
+            }
+
+            let length = if trial % 3 == 0 {
+                WINDOWS[trial % WINDOWS.len()]
+            } else {
+                rng.random::<u32>() as usize % (BITS / 2) + 1
+            };
+            let left_start = rng.random::<u32>() as usize % (BITS - length + 1);
+            let right_start = rng.random::<u32>() as usize % (BITS - length + 1);
+
+            assert_eq!(
+                bm.shared_zero_runs(0, left_start, 1, right_start, length)
+                    .collect::<Vec<_>>(),
+                naive_shared_zero_runs(&bm, 0, left_start, 1, right_start, length),
+                "trial {trial}: starts {left_start}/{right_start}, length {length}"
+            );
+        }
     }
 
     #[test]
