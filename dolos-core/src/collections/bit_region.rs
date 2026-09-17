@@ -46,6 +46,31 @@ impl<'a> BitRegion<'a> {
         (self.words[position / 64] >> (position % 64)) & 1 == 1
     }
 
+    /// The `count` bits starting at `position`, as the low bits of a `u64`.
+    /// The bits at or above `count` are clear. `count` must not exceed 64.
+    pub fn chunk(self, position: usize, count: usize) -> u64 {
+        debug_assert!(count <= 64, "count ({count}) must be <= 64");
+        debug_assert!(
+            position + count <= self.length,
+            "range end {} is out of range",
+            position + count
+        );
+        if count == 0 {
+            return 0;
+        }
+
+        let word_index = position / 64;
+        let offset = position % 64;
+        let mut chunk = self.words[word_index] >> offset;
+        // A second word is only read when the chunk crosses the word boundary.
+        // That implies `offset > 0`, so the shift below stays under 64.
+        if offset + count > 64 {
+            chunk |= self.words[word_index + 1] << (64 - offset);
+        }
+
+        chunk & mask_range(0, count)
+    }
+
     /// The number of `1` bits.
     pub fn count_ones(self) -> usize {
         self.words.iter().map(|w| w.count_ones() as usize).sum()
@@ -275,6 +300,32 @@ mod tests {
         assert_eq!(region.count_ones(), 10);
         assert_eq!(region.count_zeros(), 0);
         assert_eq!(region.next_zero_bit(0, 10), None);
+    }
+
+    #[test]
+    fn chunk_matches_bit_by_bit_reads() {
+        for length in [64, 70, 192] {
+            let positions: Vec<usize> = (0..length).filter(|p| p % 3 == 0 || p % 7 == 1).collect();
+            let words = words_with(length, &positions);
+            let region = BitRegion::new(&words, length);
+
+            for start in 0..length {
+                for count in [0, 1, 63, 64] {
+                    if start + count > length {
+                        continue;
+                    }
+                    let expected: u64 = (0..count)
+                        .filter(|&offset| region.get(start + offset))
+                        .map(|offset| 1u64 << offset)
+                        .sum();
+                    assert_eq!(
+                        region.chunk(start, count),
+                        expected,
+                        "chunk({start}, {count}) of {length} bits"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
