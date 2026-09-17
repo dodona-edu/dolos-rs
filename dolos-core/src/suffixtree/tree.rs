@@ -1,5 +1,5 @@
 use crate::Symbol;
-use crate::ignore::IgnoreMask;
+use crate::collections::vec_bitmap::VecBitmap;
 use crate::suffixtree::maximal_match::MaximalMatchAnalyzer;
 use crate::suffixtree::node::Node;
 use crate::suffixtree::tree_builder::UkkonenBuilder;
@@ -24,19 +24,26 @@ impl SuffixTree {
     /// similarity and longest-match results.
     ///
     /// * `sequences` — the sequences being analyzed.
-    /// * `ignored` — which positions are ignored; matches are split at those
-    ///   positions before being recorded.
+    /// * `ignored` — the set bits mark the ignored positions of each sequence;
+    ///   matches are split at those positions before being recorded. `None`
+    ///   ignores nothing.
     /// * `min_match_length` — minimum shared substring length to record as a match.
     /// * `keep_matches` — when `true`, the raw matches are kept in the result.
     pub fn analyze(
         &self,
         sequences: &[Vec<Symbol>],
-        ignored: &IgnoreMask,
+        ignored_mask: Option<&VecBitmap>,
         min_match_length: usize,
         keep_matches: bool,
     ) -> AnalysisResult {
-        MaximalMatchAnalyzer::new(self, sequences, ignored, min_match_length, keep_matches)
-            .analyze()
+        MaximalMatchAnalyzer::new(
+            self,
+            sequences,
+            ignored_mask,
+            min_match_length,
+            keep_matches,
+        )
+        .analyze()
     }
 }
 
@@ -283,7 +290,7 @@ mod tests_build_multiple_sequences {
 #[cfg(test)]
 mod tests_analysis {
     use crate::Symbol;
-    use crate::ignore::{IgnoreMask, IgnoredPositions};
+    use crate::collections::vec_bitmap::VecBitmap;
     use crate::suffixtree::tree::SuffixTree;
     use crate::suffixtree::tree::suffixtree_test_utils::str_to_symbols;
     use crate::suffixtree::types::AnalysisResult;
@@ -295,27 +302,22 @@ mod tests_analysis {
         let sequences: Vec<Vec<Symbol>> = inputs.iter().map(|s| str_to_symbols(s)).collect();
         let template: HashSet<Symbol> = template.iter().flat_map(|s| str_to_symbols(s)).collect();
 
-        let ignored = IgnoredPositions::new(
-            sequences
-                .iter()
-                .map(|sequence| {
-                    sequence
-                        .iter()
-                        .enumerate()
-                        .filter(|(_, symbol)| template.contains(symbol))
-                        .map(|(position, _)| position..position + 1)
-                        .collect()
-                })
-                .collect(),
-        );
         let lengths: Vec<usize> = sequences.iter().map(Vec::len).collect();
+        let mut ignored = VecBitmap::new(&lengths);
+        let mut ignores_a_symbol = false;
+        for (index, sequence) in sequences.iter().enumerate() {
+            for (position, symbol) in sequence.iter().enumerate() {
+                if template.contains(symbol) {
+                    ignored.item_mut(index).mark(position, 1);
+                    ignores_a_symbol = true;
+                }
+            }
+        }
 
-        SuffixTree::build(&sequences).analyze(
-            &sequences,
-            &IgnoreMask::new(&ignored, &lengths),
-            min_match_length,
-            true,
-        )
+        // A template that ignores no symbol takes the `None` path, like an
+        // analysis without a template.
+        let mask = ignores_a_symbol.then_some(&ignored);
+        SuffixTree::build(&sequences).analyze(&sequences, mask, min_match_length, true)
     }
 
     /// The stored matches of one pair as `(left_start, right_start, length)`,

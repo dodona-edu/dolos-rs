@@ -1,5 +1,5 @@
 use crate::Symbol;
-use crate::ignore::IgnoreMask;
+use crate::collections::vec_bitmap::VecBitmap;
 use crate::suffixtree::match_collector::MatchCollector;
 use crate::suffixtree::node::Node;
 use crate::suffixtree::tree::SuffixTree;
@@ -20,12 +20,12 @@ pub struct MaximalMatchAnalyzer<'a> {
     tree: &'a SuffixTree,
     /// The original sequences, without explicit end-of-sequence sentinels.
     sequences: &'a [Vec<Symbol>],
+    /// Which positions are ignored; forwarded to the collector.
+    ignore_mask: Option<&'a VecBitmap>,
     /// Only matches of at least this many symbols are considered.
     min_match_length: usize,
     /// Whether to keep the raw matches in the result.
     pub keep_matches: bool,
-    /// Which positions are ignored; forwarded to the collector.
-    ignored: &'a IgnoreMask,
 }
 
 impl<'a> MaximalMatchAnalyzer<'a> {
@@ -34,18 +34,18 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     /// # Arguments
     /// * `tree` – Generalized suffix tree built from all `sequences`.
     /// * `sequences` – The sequences to analyze.
-    /// * `ignored` – Which positions are ignored.
+    /// * `ignore_mask` – Which positions are ignored.
     /// * `min_match_length` – Minimum number of symbols a shared substring must
     ///   have to be counted as a match.
     /// * `keep_matches` – Whether to keep the raw matches in the result.
     pub fn new(
         tree: &'a SuffixTree,
         sequences: &'a [Vec<Symbol>],
-        ignored: &'a IgnoreMask,
+        ignore_mask: Option<&'a VecBitmap>,
         min_match_length: usize,
         keep_matches: bool,
     ) -> Self {
-        Self { tree, sequences, ignored, min_match_length, keep_matches }
+        Self { tree, sequences, ignore_mask, min_match_length, keep_matches }
     }
 
     /// Perform the full MEM analysis and return pairwise similarity results.
@@ -60,7 +60,7 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     pub fn analyze(&mut self) -> AnalysisResult {
         let mut collector = MatchCollector::new(
             self.sequences,
-            self.ignored,
+            self.ignore_mask,
             self.min_match_length,
             self.keep_matches,
         );

@@ -6,7 +6,6 @@
 //! both what the analysis needs and what the report exports.
 
 use crate::winnowing::fingerprints::Fingerprint;
-use dolos_core::IgnoredPositions;
 use std::collections::HashMap;
 use std::ops::Range;
 
@@ -33,7 +32,7 @@ pub fn classify(
     sequences: &[Vec<Fingerprint>],
     template: &[Vec<Fingerprint>],
     max_file_count: Option<usize>,
-) -> IgnoredPositions {
+) -> Vec<Vec<Range<usize>>> {
     let mut entries: HashMap<Fingerprint, Entry> = HashMap::new();
 
     // insert template entries
@@ -57,11 +56,10 @@ pub fn classify(
         }
     }
 
-    let per_file = sequences
+    sequences
         .iter()
         .map(|sequence| ignored_ranges(sequence, &entries))
-        .collect();
-    IgnoredPositions::new(per_file)
+        .collect()
 }
 
 /// The maximal ranges of `sequence` whose fingerprints are ignored.
@@ -100,9 +98,8 @@ mod tests {
     }
 
     /// The ignored positions of every file, as a plain nested `Vec`.
-    fn marked(ignored: IgnoredPositions) -> Vec<Vec<usize>> {
+    fn marked(ignored: Vec<Vec<Range<usize>>>) -> Vec<Vec<usize>> {
         ignored
-            .ranges()
             .iter()
             .map(|ranges| ranges.iter().flat_map(Clone::clone).collect())
             .collect()
@@ -149,7 +146,7 @@ mod tests {
     fn ignored_positions_are_merged_into_maximal_ranges() {
         let files = seqs(&["ABXXCDX", "AB"]);
         let ignored = classify(&files, &seqs(&["X"]), None);
-        assert_eq!(ignored.ranges()[0], [2..4, 6..7]);
+        assert_eq!(ignored[0], [2..4, 6..7]);
     }
 
     #[test]
@@ -163,6 +160,6 @@ mod tests {
     fn no_input_at_all_is_handled() {
         // A template without a single input file marks nothing.
         let ignored = classify(&[], &seqs(&["ABC"]), Some(1));
-        assert!(ignored.ranges().is_empty());
+        assert!(ignored.is_empty());
     }
 }
