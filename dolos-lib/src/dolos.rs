@@ -59,6 +59,16 @@ impl Dolos {
 
         dolos.add_files(dataset.file_set)?;
 
+        if dolos.files.len() < 2 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "a comparison needs at least 2 files, {} found",
+                    dolos.files.len()
+                ),
+            ));
+        }
+
         if let Some(ignore_path) = dolos.metadata.ignore.clone() {
             dolos.add_ignore_file(ignore_path)?;
         }
@@ -173,7 +183,8 @@ impl Dolos {
             &self.metadata.analysis_options(),
         )
         .expect(
-            "the fingerprints are hashed below the sentinel and classify indexes its own input",
+            "Dolos::new checks the file count, the fingerprints are hashed below the sentinel, \
+             and classify indexes its own input",
         );
 
         let fragments = matches
