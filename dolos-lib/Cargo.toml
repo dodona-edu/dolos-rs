@@ -2,6 +2,9 @@
 name = "dolos-lib"
 version = "0.1.0"
 edition = "2024"
+description = "A library that detects plagiarism in source code. It tokenizes files, winnows them into fingerprints and reports the similarity of every pair."
+repository = "https://github.com/dodona-edu/dolos-rs"
+license = "MIT"
 
 [lib]
 name = "dolos"
