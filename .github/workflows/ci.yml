@@ -71,6 +71,11 @@ jobs:
           tool: wasm-pack
       - run: cargo test -p dolos-core --features wasm
       - run: cargo clippy --target wasm32-unknown-unknown -p dolos-core --features wasm -- -D warnings
-      - run: wasm-pack build dolos-core --target bundler --release --scope dodona -- --features wasm
+      - run: wasm-pack build dolos-core --target bundler --release -- --features wasm
       - run: wasm-pack build dolos-core --target nodejs --out-dir pkg-node --release -- --features wasm
-      - run: node dolos-core/tests/smoke.mjs
+      - run: npm ci
+        working-directory: dolos-core/tests-typescript
+      - run: npm run typecheck
+        working-directory: dolos-core/tests-typescript
+      - run: npm test
+        working-directory: dolos-core/tests-typescript

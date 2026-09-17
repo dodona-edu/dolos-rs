@@ -48,16 +48,16 @@ its dependencies.
 
 ```sh
 rustup target add wasm32-unknown-unknown
-wasm-pack build dolos-core --target bundler --release --scope dodona -- --features wasm
+wasm-pack build dolos-core --target bundler --release -- --features wasm
 ```
 
-This writes the npm package `@dodona/dolos-core` to `dolos-core/pkg/`, which git
+This writes the npm package `dolos-core` to `dolos-core/pkg/`, which git
 ignores. The package version follows the crate version.
 
 ```ts
-import { analyze } from "@dodona/dolos-core";
+import { analyze } from "dolos-core";
 
-// `ignored` holds the positions to leave out, one list of `[start, end)`
+// `ignored` holds the positions to leave out, one list of `{ start, end }`
 // intervals per sequence. Pass `null` to ignore nothing.
 using analysis = analyze(fingerprints, ignored, { minMatchLength: 5, keepMatches: true });
 
