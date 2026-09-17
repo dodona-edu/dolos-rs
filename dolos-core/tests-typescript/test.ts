@@ -67,8 +67,8 @@ test("matches are absent, not null, unless the run keeps them", () => {
 // can show is that the throw is catchable, and that a value above 2^32 does not
 // survive the conversion to `usize` on wasm32.
 test("unusable input throws a catchable Error instead of trapping the module", () => {
-  assert.throws(() => analyze([[1], [4294967295]], null, kept), Error, "reserved symbol");
-  assert.throws(() => analyze([[1], [2 ** 32]], null, kept), Error, "value above 2^32");
+  assert.throws(() => analyze([[1], [4294967295]], null, kept), /reserved end-of-sequence symbol/);
+  assert.throws(() => analyze([[1], [2 ** 32]], null, kept), /expected usize/);
   // `[]` covers no sequence. `null` is how a caller ignores nothing.
   assert.throws(() => analyze([symbols("AB"), symbols("AB")], [], kept), /cover 0 sequences/);
 
