@@ -8,9 +8,10 @@ use crate::report::Report;
 use crate::winnowing::fingerprints::{Fingerprint, Winnow};
 use crate::winnowing::region::Region;
 use crate::winnowing::tokenizer::{Tokenizer, Tokens};
-use dolos_core::{AnalysisResult, IgnoredPositions};
+use dolos_core::AnalysisResult;
 use std::fmt;
 use std::io::{Error, ErrorKind, Result};
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -57,6 +58,16 @@ impl Dolos {
         };
 
         dolos.add_files(dataset.file_set)?;
+
+        if dolos.files.len() < 2 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "a comparison needs at least 2 files, {} found",
+                    dolos.files.len()
+                ),
+            ));
+        }
 
         if let Some(ignore_path) = dolos.metadata.ignore.clone() {
             dolos.add_ignore_file(ignore_path)?;
@@ -141,7 +152,7 @@ impl Dolos {
     ///
     /// Takes the fingerprints and the locations out of the analysis, so it must
     /// run after the fragments are resolved.
-    fn attach_analysis_data(&mut self, ignored: IgnoredPositions) {
+    fn attach_analysis_data(&mut self, ignored: Vec<Vec<Range<usize>>>) {
         let fingerprints = std::mem::take(&mut self.fingerprints);
         let regions = self
             .locations
@@ -153,7 +164,7 @@ impl Dolos {
             .iter_mut()
             .zip(fingerprints)
             .zip(regions)
-            .zip(ignored.ranges())
+            .zip(ignored)
         {
             file.analysis_data = Some(AnalysisData { fingerprints, regions, ignored });
         }
@@ -168,8 +179,12 @@ impl Dolos {
         );
         let AnalysisResult { metrics, matches } = dolos_core::analyze(
             &self.fingerprints,
-            &ignored,
+            Some(&ignored),
             &self.metadata.analysis_options(),
+        )
+        .expect(
+            "Dolos::new checks the file count, the fingerprints are hashed below the sentinel, \
+             and classify indexes its own input",
         );
 
         let fragments = matches
