@@ -52,7 +52,7 @@ impl<'a> MaximalMatchAnalyzer<'a> {
     ///
     /// Traverses the suffix tree depth-first, identifies all maximal exact
     /// matches that meet `min_match_length`, and aggregates them into an
-    /// [`AnalysisResult`] containing per-pair similarity scores and longest
+    /// [`AnalysisResult`] containing per-pair similarity scores and
     /// longest-match lengths.
     ///
     /// A match is suppressed only when its length does not meet
