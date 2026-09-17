@@ -150,7 +150,10 @@ mod tests {
         let ab = report
             .pairs
             .iter()
-            .find(|p| p.left_file.as_ref() == files[0].as_ref())
+            .find(|p| {
+                p.left_file.as_ref() == files[0].as_ref()
+                    && p.right_file.as_ref() == files[1].as_ref()
+            })
             .expect("a.js-b.js pair not found");
         assert_eq!(ab.metrics.similarity, 0.5);
         assert_eq!(ab.metrics.longest_match, 3);

@@ -75,7 +75,7 @@ impl Metadata {
     }
 
     /// The analysis options this run uses.
-    pub fn analysis_options(&self) -> AnalysisOptions {
+    pub(crate) fn analysis_options(&self) -> AnalysisOptions {
         AnalysisOptions {
             min_match_length: self.min_length_match,
             keep_matches: self.include_fragments,

@@ -241,6 +241,28 @@ pub struct OutputArgs {
     pub open_browser: bool,
 }
 
+/// Check the argument combinations that span both `DolosArgs` and `OutputArgs`.
+///
+/// # Errors
+/// Returns an error when `--include-analysis-data` is combined with the
+/// terminal output format, which does not write that data.
+pub fn validate_args(dolos_args: &DolosArgs, output_args: &OutputArgs) -> std::io::Result<()> {
+    let terminal = matches!(
+        output_args.output_format,
+        OutputFormat::Terminal | OutputFormat::Console
+    );
+
+    if dolos_args.include_analysis_data && terminal {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "--include-analysis-data does not work with the terminal output format. \
+             Use -f csv or -f web to write the analysis data.",
+        ));
+    }
+
+    Ok(())
+}
+
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 pub struct Opts {
@@ -291,6 +313,17 @@ mod tests {
     fn output(extra: &[&str]) -> OutputArgs {
         match parse(extra).unwrap().command {
             Command::Run { output_args, .. } => output_args,
+        }
+    }
+
+    /// Parse options and run the cross-group argument checks.
+    ///
+    /// Panics if clap rejects the argv.
+    fn validate(extra: &[&str]) -> std::io::Result<()> {
+        match parse(extra).unwrap().command {
+            Command::Run { dolos_args, output_args, .. } => {
+                validate_args(&dolos_args, &output_args)
+            }
         }
     }
 
@@ -363,6 +396,20 @@ mod tests {
             Opts::try_parse_from(["dolos", "run"]).is_err(),
             "missing files should fail"
         );
+    }
+
+    #[test]
+    fn analysis_data_with_terminal_output_is_rejected() {
+        let error = validate(&["--include-analysis-data"]).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidInput);
+        assert!(
+            validate(&["--include-analysis-data", "-f", "console"]).is_err(),
+            "console is the terminal format under another name"
+        );
+
+        assert!(validate(&["--include-analysis-data", "-f", "csv"]).is_ok());
+        assert!(validate(&["--include-analysis-data", "-f", "web"]).is_ok());
+        assert!(validate(&[]).is_ok());
     }
 
     #[test]
