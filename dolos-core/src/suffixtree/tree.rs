@@ -304,15 +304,20 @@ mod tests_analysis {
 
         let lengths: Vec<usize> = sequences.iter().map(Vec::len).collect();
         let mut ignored = VecBitmap::new(&lengths);
+        let mut ignores_a_symbol = false;
         for (index, sequence) in sequences.iter().enumerate() {
             for (position, symbol) in sequence.iter().enumerate() {
                 if template.contains(symbol) {
                     ignored.item_mut(index).mark(position, 1);
+                    ignores_a_symbol = true;
                 }
             }
         }
 
-        SuffixTree::build(&sequences).analyze(&sequences, Some(&ignored), min_match_length, true)
+        // A template that ignores no symbol takes the `None` path, like an
+        // analysis without a template.
+        let mask = ignores_a_symbol.then_some(&ignored);
+        SuffixTree::build(&sequences).analyze(&sequences, mask, min_match_length, true)
     }
 
     /// The stored matches of one pair as `(left_start, right_start, length)`,

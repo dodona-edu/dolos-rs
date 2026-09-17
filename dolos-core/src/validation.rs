@@ -13,9 +13,9 @@ use std::ops::Range;
 /// Check that [`analyze`](crate::analyze) accepts this input.
 ///
 /// There must be at least two sequences, because the analysis compares pairs.
-/// `ignored` is `None`, or one list of ranges per sequence. Its ranges must be
-/// ordered and stay within the sequence they index. Empty and overlapping ranges
-/// are allowed.
+/// `ignored` is `None`, or one list of ranges per sequence. A range must not
+/// start after it ends, and must stay within the sequence it indexes. Empty and
+/// overlapping ranges are allowed, and the order of the ranges does not matter.
 ///
 /// # Errors
 ///
