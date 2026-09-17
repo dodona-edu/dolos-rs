@@ -9,20 +9,13 @@ use std::ops::Range;
 #[cfg_attr(
     feature = "wasm",
     derive(serde::Deserialize, tsify::Tsify),
-    serde(default, rename_all = "camelCase")
+    serde(rename_all = "camelCase")
 )]
 pub struct AnalysisOptions {
     /// Minimum shared substring length, in symbols. At least 1.
     pub min_match_length: usize,
     /// Keep the raw matches of every pair.
     pub keep_matches: bool,
-}
-
-impl Default for AnalysisOptions {
-    /// The shortest match length the analysis accepts, and no matches kept.
-    fn default() -> Self {
-        Self { min_match_length: 1, keep_matches: false }
-    }
 }
 
 /// Compare all sequences pairwise. The analysis finds the maximal exact matches
