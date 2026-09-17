@@ -1,4 +1,5 @@
-use dolos::{Dolos, DolosConfig, PairSortBy, Report};
+use dolos::{AnalysisData, Dolos, DolosConfig, File, Fragment, PairSortBy, Point, Report};
+use dolos_core::{AnalysisOptions, IgnoredPositions};
 use rstest::rstest;
 use std::path::PathBuf;
 
@@ -231,4 +232,130 @@ fn an_inert_template_ignores_nothing() {
     for file in &report.files {
         assert!(file.analysis_data.as_ref().unwrap().ignored.is_empty());
     }
+}
+
+// ── Replaying a pair from the exported data ───────────────────────────────────
+
+/// Three files, a cap that ignores the fingerprints shared by all of them, and
+/// the matches kept so the fragments can be compared too.
+fn replay_config() -> DolosConfig {
+    DolosConfig::builder()
+        .include_analysis_data(true)
+        .max_fingerprint_count(2)
+        .compare(true)
+        .build()
+        .unwrap()
+}
+
+/// The analysis options that produced `report`.
+fn analysis_options(report: &Report) -> AnalysisOptions {
+    AnalysisOptions {
+        min_match_length: report.metadata.min_length_match,
+        keep_matches: report.metadata.include_fragments,
+    }
+}
+
+/// Fragments in a fixed order. Tree traversal order depends on the whole
+/// corpus, so a rerun finds the same matches in another order.
+fn sorted(fragments: &[Fragment]) -> Vec<(Point, Point, usize)> {
+    let mut sorted: Vec<_> = fragments
+        .iter()
+        .map(|f| {
+            (
+                f.left_region.start_point,
+                f.right_region.start_point,
+                f.fingerprint_count,
+            )
+        })
+        .collect();
+    sorted.sort_unstable();
+    sorted
+}
+
+/// The exported analysis data of `file`.
+fn data(file: &File) -> &AnalysisData {
+    file.analysis_data
+        .as_ref()
+        .expect("analysis data is present when include_analysis_data is set")
+}
+
+/// Every pair of the report, analysed again from the two files' exported
+/// fingerprints and ignored positions, gives the metrics and the fragments of
+/// the full run.
+#[test]
+fn a_pair_replayed_from_the_exported_data_reproduces_the_run() {
+    let report = report(SAMPLE123, replay_config());
+    let options = analysis_options(&report);
+
+    // The cap must ignore something without swallowing the corpus, or this
+    // proves nothing.
+    let ignored: usize = report
+        .files
+        .iter()
+        .flat_map(|f| data(f).ignored.iter())
+        .map(|r| r.len())
+        .sum();
+    let total: usize = report
+        .files
+        .iter()
+        .map(|f| data(f).fingerprints.len())
+        .sum();
+    assert!(
+        (1..total).contains(&ignored),
+        "ignored {ignored} of {total} fingerprints"
+    );
+
+    for pair in &report.pairs {
+        let (left, right) = (data(&pair.left_file), data(&pair.right_file));
+        let sequences = vec![left.fingerprints.clone(), right.fingerprints.clone()];
+        let positions = IgnoredPositions::new(vec![left.ignored.clone(), right.ignored.clone()]);
+        let names = format!(
+            "({}, {})",
+            pair.left_file.relative_path.display(),
+            pair.right_file.relative_path.display()
+        );
+
+        let rerun = dolos_core::analyze(&sequences, &positions, &options);
+
+        assert_eq!(
+            rerun.metrics.get(0, 1),
+            &pair.metrics,
+            "metrics differ for {names}"
+        );
+
+        let replayed: Vec<Fragment> = rerun
+            .matches
+            .as_ref()
+            .expect("matches are kept")
+            .get(0, 1)
+            .iter()
+            .map(|m| Fragment::resolve(m, &left.regions, &right.regions))
+            .collect();
+        assert_eq!(
+            sorted(&replayed),
+            sorted(pair.fragments.as_ref().unwrap()),
+            "fragments differ for {names}"
+        );
+    }
+}
+
+/// The frequency cap counts the files of the whole corpus, so a rerun of two
+/// files cannot apply it again. Without the exported ignored positions the
+/// rerun gives other metrics.
+#[test]
+fn a_rerun_without_the_exported_positions_disagrees() {
+    let report = report(SAMPLE123, replay_config());
+    let options = analysis_options(&report);
+    let pair = &report.pairs[0];
+
+    let (left, right) = (data(&pair.left_file), data(&pair.right_file));
+    let sequences = vec![left.fingerprints.clone(), right.fingerprints.clone()];
+
+    let blind = dolos_core::analyze(&sequences, &IgnoredPositions::default(), &options);
+
+    assert_ne!(
+        blind.metrics.get(0, 1),
+        &pair.metrics,
+        "the exported ignored positions changed nothing"
+    );
 }
