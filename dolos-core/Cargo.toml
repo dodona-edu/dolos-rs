@@ -11,7 +11,6 @@ license = "MIT"
 crate-type = ["cdylib", "rlib"]
 
 [features]
-# Off by default: a normal build pulls none of the dependencies below.
 wasm = ["dep:serde", "dep:serde-wasm-bindgen", "dep:tsify", "dep:wasm-bindgen"]
 
 [dependencies]
@@ -22,16 +21,3 @@ wasm-bindgen = { version = "0.2.128", optional = true }
 
 [dev-dependencies]
 rand = "0.10.1"
-
-[package.metadata.wasm-pack.profile.release]
-# wasm-pack's bundled wasm-opt rejects the bulk-memory instructions rustc emits
-# unless every feature is named here.
-wasm-opt = [
-    "-O",
-    "--enable-bulk-memory",
-    "--enable-nontrapping-float-to-int",
-    "--enable-reference-types",
-    "--enable-mutable-globals",
-    "--enable-sign-ext",
-    "--enable-multivalue",
-]
