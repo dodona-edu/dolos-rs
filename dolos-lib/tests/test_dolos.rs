@@ -1,5 +1,5 @@
 use dolos::{AnalysisData, Dolos, DolosConfig, File, Fragment, PairSortBy, Point, Report};
-use dolos_core::{AnalysisOptions, IgnoredPositions};
+use dolos_core::AnalysisOptions;
 use rstest::rstest;
 use std::io::ErrorKind;
 use std::path::PathBuf;
@@ -324,14 +324,15 @@ fn a_pair_replayed_from_the_exported_data_reproduces_the_run() {
     for pair in &report.pairs {
         let (left, right) = (data(&pair.left_file), data(&pair.right_file));
         let sequences = vec![left.fingerprints.clone(), right.fingerprints.clone()];
-        let positions = IgnoredPositions::new(vec![left.ignored.clone(), right.ignored.clone()]);
+        let positions = vec![left.ignored.clone(), right.ignored.clone()];
         let names = format!(
             "({}, {})",
             pair.left_file.relative_path.display(),
             pair.right_file.relative_path.display()
         );
 
-        let rerun = dolos_core::analyze(&sequences, &positions, &options);
+        let rerun = dolos_core::analyze(&sequences, Some(&positions), &options)
+            .expect("the exported data is a valid input");
 
         assert_eq!(
             rerun.metrics.get(0, 1),
@@ -367,7 +368,8 @@ fn a_rerun_without_the_exported_positions_disagrees() {
     let (left, right) = (data(&pair.left_file), data(&pair.right_file));
     let sequences = vec![left.fingerprints.clone(), right.fingerprints.clone()];
 
-    let blind = dolos_core::analyze(&sequences, &IgnoredPositions::default(), &options);
+    let blind = dolos_core::analyze(&sequences, None, &options)
+        .expect("the exported data is a valid input");
 
     assert_ne!(
         blind.metrics.get(0, 1),
