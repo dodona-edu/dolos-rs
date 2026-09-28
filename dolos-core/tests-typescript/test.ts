@@ -5,20 +5,11 @@
 //   wasm-pack build dolos-core --target nodejs --out-dir pkg-node --release -- --features wasm
 
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import {
-  analyze,
-  type AnalysisOptions,
-  type Interval,
-  type Match,
-  type PairMetrics,
-} from "../pkg-node/dolos_core.js";
+import {test} from "node:test";
+import {analyze, type Interval, type PairMetrics,} from "../pkg-node/dolos_core.js";
 
 // One symbol per code unit of `text`.
 const symbols = (text: string): number[] => [...text].map((c) => c.charCodeAt(0));
-
-const kept: AnalysisOptions = { minMatchLength: 1, keepMatches: true };
-const dropped: AnalysisOptions = { minMatchLength: 1, keepMatches: false };
 
 test("a pair reports its counts, metrics and matches", () => {
   using analysis = analyze([symbols("ABCDE"), symbols("ABCDE")], null, {
@@ -47,7 +38,7 @@ test("a pair reports its counts, metrics and matches", () => {
 test("an ignored interval splits a match and leaves its position out of the total", () => {
   const ignored: Interval[][] = [[{ start: 2, end: 3 }], [{ start: 2, end: 3 }]];
 
-  using analysis = analyze([symbols("ABCDE"), symbols("ABCDE")], ignored, kept);
+  using analysis = analyze([symbols("ABCDE"), symbols("ABCDE")], ignored, {minMatchLength: 1, keepMatches: true});
 
   assert.deepEqual(analysis.matches(0, 1), [
     { leftStart: 0, rightStart: 0, length: 2 },
@@ -57,28 +48,24 @@ test("an ignored interval splits a match and leaves its position out of the tota
 });
 
 test("matches are absent, not null, unless the run keeps them", () => {
-  using analysis = analyze([symbols("AB"), symbols("AB")], null, dropped);
+  using analysis = analyze([symbols("AB"), symbols("AB")], null, {minMatchLength: 1, keepMatches: false});
 
   assert.equal(analysis.hasMatches, false);
   assert.equal(analysis.matches(0, 1), undefined);
 });
 
-// `validate_input` itself is covered by the Rust tests. What only the boundary
-// can show is that the throw is catchable, and that a value above 2^32 does not
-// survive the conversion to `usize` on wasm32.
-test("unusable input throws a catchable Error instead of trapping the module", () => {
-  assert.throws(() => analyze([[1], [4294967295]], null, kept), /reserved end-of-sequence symbol/);
-  assert.throws(() => analyze([[1], [2 ** 32]], null, kept), /expected usize/);
-  // `[]` covers no sequence. `null` is how a caller ignores nothing.
-  assert.throws(() => analyze([symbols("AB"), symbols("AB")], [], kept), /cover 0 sequences/);
+test("unusable input throws a catchable Error", () => {
+  assert.throws(() => analyze([[1], [4294967295]], null, {minMatchLength: 1, keepMatches: true}), /reserved end-of-sequence symbol/);
+  assert.throws(() => analyze([[1], [2 ** 32]], null, {minMatchLength: 1, keepMatches: true}), /expected usize/);
+  assert.throws(() => analyze([symbols("AB"), symbols("AB")], [], {minMatchLength: 1, keepMatches: true}), /cover 0 sequences/);
 
   // The module still works after the rejections, so none of them trapped it.
-  using analysis = analyze([symbols("AB"), symbols("AB")], null, kept);
+  using analysis = analyze([symbols("AB"), symbols("AB")], null, {minMatchLength: 1, keepMatches: true});
   assert.equal(analysis.metrics(0, 1).longestMatch, 2);
 });
 
 test("indices that name no pair throw instead of reaching PairArray", () => {
-  using analysis = analyze([symbols("AB"), symbols("AB")], null, kept);
+  using analysis = analyze([symbols("AB"), symbols("AB")], null, {minMatchLength: 1, keepMatches: true});
 
   assert.throws(() => analysis.metrics(1, 1), /does not form a pair with itself/);
   assert.throws(() => analysis.metrics(0, 2), /out of range/);
