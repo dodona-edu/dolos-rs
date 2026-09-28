@@ -2,8 +2,7 @@
 //!
 //! A fingerprint value is ignored when it occurs in the supplied template or
 //! when it occurs in more than `max_file_count` distinct files. [`classify`]
-//! turns that into the positions each file's fingerprint array loses, which is
-//! both what the analysis needs and what the report exports.
+//! turns that into the positions each file's fingerprint array loses.
 
 use crate::winnowing::fingerprints::Fingerprint;
 use std::collections::HashMap;
