@@ -7,7 +7,6 @@ use crate::report::Report;
 use crate::winnowing::fingerprints::{Fingerprint, Winnow};
 use crate::winnowing::region::Region;
 use crate::winnowing::tokenizer::{Tokenizer, Tokens};
-use dolos_core::AnalysisOptions;
 use std::fmt;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
@@ -143,11 +142,12 @@ impl Dolos {
             &self.ignore_hashes,
             self.metadata.max_fingerprint_file_count,
         );
-        let options = AnalysisOptions {
-            min_match_length: self.metadata.min_length_match,
-            keep_matches: self.metadata.include_fragments,
-        };
-        let result = dolos_core::analyze(&self.hashes, Some(&ignored), &options).expect(
+        let result = dolos_core::analyze(
+            &self.hashes,
+            Some(&ignored),
+            &self.metadata.analysis_options(),
+        )
+        .expect(
             "Dolos::new checks the file count, the fingerprints are hashed below the sentinel, \
              and classify indexes its own input",
         );
