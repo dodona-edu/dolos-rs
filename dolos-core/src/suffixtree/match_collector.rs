@@ -59,12 +59,13 @@ impl<'a> MatchCollector<'a> {
 
         // Both sequences are walked: the caller may ignore different positions
         // in each one, so a run is usable only where neither side is ignored.
-        for run in ignored.shared_zero_runs(
+        for run in ignored.shared_runs(
             sp1.sequence_index,
             sp1.start,
             sp2.sequence_index,
             sp2.start,
             length,
+            false,
         ) {
             self.record_run(&sp1.shifted(run.start), &sp2.shifted(run.start), run.len());
         }
