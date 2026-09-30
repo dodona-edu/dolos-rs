@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 /// A borrowed view over one bit-vector: the packed `u64` words plus the number
 /// of bits they hold.
 ///
@@ -132,6 +134,20 @@ impl<'a> BitRegion<'a> {
     /// range is empty or holds no `0` bit.
     pub fn next_zero_bit(self, start: usize, end: usize) -> Option<usize> {
         self.next_bit(start, end, false)
+    }
+
+    /// The maximal runs within `range`, in ascending order. `bit` selects
+    /// which value the runs hold.
+    pub fn runs(self, range: Range<usize>, bit: bool) -> impl Iterator<Item = Range<usize>> + 'a {
+        let Range { mut start, end } = range;
+
+        std::iter::from_fn(move || {
+            let run_start = self.next_bit(start, end, bit)?;
+            let run_end = self.next_bit(run_start, end, !bit).unwrap_or(end);
+
+            start = run_end;
+            Some(run_start..run_end)
+        })
     }
 
     /// The positions of the `1` bits, in ascending order.
