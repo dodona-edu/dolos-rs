@@ -21,13 +21,16 @@ pub fn write_table<'a, T: 'a>(
     rows: impl IntoIterator<Item = &'a T>,
 ) -> Result<()> {
     let mut writer = csv::Writer::from_path(path).map_err(Error::other)?;
+
     writer
-        .write_record(columns.iter().map(|c| c.name))
+        .write_record(columns.iter().map(|column| column.name))
         .map_err(Error::other)?;
+
     for row in rows {
         writer
-            .write_record(columns.iter().map(|c| (c.value)(row)))
+            .write_record(columns.iter().map(|column| (column.value)(row)))
             .map_err(Error::other)?;
     }
+
     writer.flush()
 }
