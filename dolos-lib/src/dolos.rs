@@ -17,8 +17,6 @@ use std::rc::Rc;
 
 pub struct Dolos {
     metadata: Metadata,
-    /// The files being compared, parallel to `fingerprints` and, when they are
-    /// kept, `locations`. Their analysis data is filled in by [`Dolos::build_report`].
     files: Vec<File>,
     fingerprints: Vec<Vec<Fingerprint>>,
     template_fingerprints: Vec<Vec<Fingerprint>>,
@@ -40,8 +38,6 @@ impl Dolos {
 
         let tokenizer = Tokenizer::new(metadata.language);
 
-        // The regions are needed both to resolve fragments and to export the
-        // analysis data.
         let locations = if metadata.include_fragments || metadata.include_analysis_data {
             Some(Vec::new())
         } else {
