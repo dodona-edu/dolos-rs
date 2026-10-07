@@ -10,6 +10,8 @@ pub struct MetadataRow<'a> {
 }
 
 impl<'a> MetadataRow<'a> {
+    pub const HEADER: [&'static str; 2] = ["property", "value"];
+
     pub fn new(property: &'a str, value: &'a str) -> Self {
         Self { property, value }
     }
@@ -24,6 +26,8 @@ pub struct FileRow<'a> {
 }
 
 impl<'a> FileRow<'a> {
+    pub const HEADER: [&'static str; 3] = ["id", "path", "content"];
+
     pub fn new(file: &'a File) -> Self {
         Self {
             id: file.id,
@@ -49,6 +53,19 @@ pub struct PairRow<'a> {
 }
 
 impl<'a> PairRow<'a> {
+    pub const HEADER: [&'static str; 10] = [
+        "file1_id",
+        "file1_path",
+        "file2_id",
+        "file2_path",
+        "similarity",
+        "longest",
+        "total_left",
+        "total_right",
+        "overlap_left",
+        "overlap_right",
+    ];
+
     pub fn new(pair: &'a Pair) -> Self {
         Self {
             file1_id: pair.left_file.id,
@@ -80,6 +97,18 @@ pub struct FragmentRow<'a> {
 }
 
 impl<'a> FragmentRow<'a> {
+    pub const HEADER: [&'static str; 9] = [
+        "file1_id",
+        "file1_path",
+        "file1_start_point",
+        "file1_end_point",
+        "file2_id",
+        "file2_path",
+        "file2_start_point",
+        "file2_end_point",
+        "fingerprint_count",
+    ];
+
     pub fn new(pair: &'a Pair, fragment: &Fragment) -> Self {
         Self {
             file1_id: pair.left_file.id,
