@@ -4,7 +4,6 @@ use crate::ignore;
 use crate::metadata::Metadata;
 use crate::reader::Dataset;
 use crate::report::Report;
-use crate::suffixtree::SuffixTree;
 use crate::winnowing::fingerprints::{Fingerprint, Winnow};
 use crate::winnowing::region::Region;
 use crate::winnowing::tokenizer::{Tokenizer, Tokens};
@@ -47,6 +46,16 @@ impl Dolos {
         };
 
         dolos.add_files(dataset.file_set)?;
+
+        if dolos.files.len() < 2 {
+            return Err(Error::new(
+                ErrorKind::InvalidInput,
+                format!(
+                    "a comparison needs at least 2 files, {} found",
+                    dolos.files.len()
+                ),
+            ));
+        }
 
         if let Some(ignore_path) = dolos.metadata.ignore.clone() {
             dolos.add_ignore_file(ignore_path)?;
@@ -126,19 +135,21 @@ impl Dolos {
         Ok(())
     }
 
-    /// Run the suffix-tree analysis and build a [`Report`].
+    /// Run the analysis and build a [`Report`].
     pub fn build_report(self) -> Report {
         let ignored = ignore::classify(
             &self.hashes,
             &self.ignore_hashes,
             self.metadata.max_fingerprint_file_count,
         );
-        let tree = SuffixTree::build(&self.hashes);
-        let result = tree.analyze(
+        let result = dolos_core::analyze(
             &self.hashes,
-            &ignored,
-            self.metadata.min_length_match,
-            self.metadata.include_fragments,
+            Some(&ignored),
+            &self.metadata.analysis_options(),
+        )
+        .expect(
+            "Dolos::new checks the file count, the fingerprints are hashed below the sentinel, \
+             and classify indexes its own input",
         );
         Report::new(result, self.files, self.locations, self.metadata)
     }
