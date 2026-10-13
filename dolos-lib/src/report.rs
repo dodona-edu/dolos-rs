@@ -134,31 +134,7 @@ mod tests {
     use crate::metadata::Metadata;
     use crate::suffixtree::{AnalysisResult, Match, PairMetrics};
     use crate::winnowing::region::{Point, Region};
-    use chrono::Utc;
-    use std::path::PathBuf;
     use std::rc::Rc;
-    use tree_sitter_grammars::Language;
-
-    fn make_metadata(
-        sort_by: Option<PairSortBy>,
-        fragment_sort_by: Option<FragmentSortBy>,
-    ) -> Metadata {
-        Metadata {
-            report_name: "test".to_string(),
-            created_at: Utc::now(),
-            sort_by,
-            fragment_sort_by,
-            kgram_length: 23,
-            kgrams_in_window: 17,
-            language: Language::Javascript,
-            language_detected: true,
-            include_comments: false,
-            include_fragments: true,
-            min_length_match: 1,
-            max_fingerprint_file_count: None,
-            ignore: None,
-        }
-    }
 
     fn make_report(
         analysis: AnalysisResult,
@@ -171,16 +147,8 @@ mod tests {
             analysis,
             files,
             locations,
-            make_metadata(sort_by, fragment_sort_by),
+            Metadata { sort_by, fragment_sort_by, ..Metadata::fixture() },
         )
-    }
-
-    fn make_file(id: usize, name: &str) -> Rc<File> {
-        Rc::new(File {
-            id,
-            relative_path: PathBuf::from(name),
-            content: "".to_string(),
-        })
     }
 
     fn make_metrics(similarity: f64) -> PairMetrics {
@@ -199,9 +167,9 @@ mod tests {
     #[test]
     fn test_from() {
         let files = vec![
-            make_file(0, "a.js"),
-            make_file(1, "b.js"),
-            make_file(2, "c.js"),
+            Rc::new(File::fixture(0, "a.js")),
+            Rc::new(File::fixture(1, "b.js")),
+            Rc::new(File::fixture(2, "c.js")),
         ];
         let mut metrics = PairArray::new(3, PairMetrics::default());
         metrics.set(0, 1, make_metrics(0.5));
@@ -271,9 +239,9 @@ mod tests {
     #[test]
     fn test_all_pairs() {
         let files = vec![
-            make_file(0, "x.js"),
-            make_file(1, "y.js"),
-            make_file(2, "z.js"),
+            Rc::new(File::fixture(0, "x.js")),
+            Rc::new(File::fixture(1, "y.js")),
+            Rc::new(File::fixture(2, "z.js")),
         ];
         let metrics = PairArray::new(3, make_metrics(0.0));
         let analysis = AnalysisResult { metrics, matches: None };
@@ -296,9 +264,9 @@ mod tests {
     #[test]
     fn test_sort_by_similarity() {
         let files = vec![
-            make_file(0, "a.js"),
-            make_file(1, "b.js"),
-            make_file(2, "c.js"),
+            Rc::new(File::fixture(0, "a.js")),
+            Rc::new(File::fixture(1, "b.js")),
+            Rc::new(File::fixture(2, "c.js")),
         ];
         let mut metrics = PairArray::new(3, PairMetrics::default());
         metrics.set(0, 1, make_metrics(0.5));
@@ -342,7 +310,10 @@ mod tests {
         };
         let report = make_report(
             analysis,
-            vec![make_file(0, "a.js"), make_file(1, "b.js")],
+            vec![
+                Rc::new(File::fixture(0, "a.js")),
+                Rc::new(File::fixture(1, "b.js")),
+            ],
             Some(locations),
             None,
             Some(FragmentSortBy::KgramsDescending),

@@ -48,6 +48,18 @@ impl fmt::Debug for File {
     }
 }
 
+#[cfg(test)]
+impl File {
+    /// An empty `File` with the given id and path for unit tests.
+    pub(crate) fn fixture(id: usize, relative_path: &str) -> File {
+        File {
+            id,
+            relative_path: PathBuf::from(relative_path),
+            content: String::new(),
+        }
+    }
+}
+
 /// A set of source files to analyze: a base directory and paths relative to it.
 /// The relative paths serve as display paths in the output.
 #[derive(Debug, Clone)]

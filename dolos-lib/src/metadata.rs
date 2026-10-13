@@ -96,3 +96,25 @@ impl Metadata {
 fn optional(value: Option<String>) -> String {
     value.unwrap_or_else(|| "null".to_string())
 }
+
+#[cfg(test)]
+impl Metadata {
+    /// A complete `Metadata` with default values for unit tests.
+    pub(crate) fn fixture() -> Metadata {
+        Metadata {
+            report_name: "test".to_string(),
+            created_at: Utc::now(),
+            sort_by: None,
+            fragment_sort_by: None,
+            kgram_length: 23,
+            kgrams_in_window: 17,
+            language: Language::Javascript,
+            language_detected: true,
+            include_comments: false,
+            include_fragments: true,
+            min_length_match: 1,
+            max_fingerprint_file_count: None,
+            ignore: None,
+        }
+    }
+}
