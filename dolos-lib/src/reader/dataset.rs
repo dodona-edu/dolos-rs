@@ -39,40 +39,46 @@ impl Dataset {
                 "No input paths provided",
             )),
             [path] => Self::from_single_path(path, language),
-            _ => {
-                let files = resolve::from_files(paths)?;
-                Self::new(None, FileSet::new(PathBuf::new(), files), None, language)
-            }
+            _ => Self::from_multi_path(paths, language),
         }
     }
 
+    fn from_multi_path(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
+        let files = resolve::from_files(paths)?;
+        Self::new(None, FileSet::new(PathBuf::new(), files), None, language)
+    }
+
     fn from_single_path(path: &Path, language: Option<Language>) -> Result<Self> {
+        // directory
         if path.is_dir() {
-            // directory
             let (name, files) = resolve::from_directory(path)?;
-            Self::new(Some(name), FileSet::new(path, files), None, language)
-        } else if path.extension().is_some_and(|ext| ext == "csv") {
-            // CSV file
+            return Self::new(Some(name), FileSet::new(path, files), None, language);
+        }
+
+        // CSV file
+        if path.extension().is_some_and(|ext| ext == "csv") {
             let (name, files) = resolve::from_csv(path)?;
             let base_dir = path.parent().unwrap_or(Path::new("."));
-            Self::new(Some(name), FileSet::new(base_dir, files), None, language)
-        } else if let Some(extracted) = archive::try_extract(path)? {
-            // archive
+            return Self::new(Some(name), FileSet::new(base_dir, files), None, language);
+        }
+
+        // archive
+        if let Some(extracted) = archive::try_extract(path)? {
             let dir = extracted.temp_dir.path();
             let (_, files) = resolve::from_directory(dir)?;
-            Self::new(
+            return Self::new(
                 Some(extracted.name),
                 FileSet::new(dir, files),
                 Some(extracted.temp_dir),
                 language,
-            )
-        } else {
-            Err(Error::new(
-                ErrorKind::InvalidInput,
-                "A single path must be a directory, a CSV file, or a supported archive \
-                 (.zip, .tar, .tar.gz, .tgz, .tar.bz2, .tbz, .tbz2)",
-            ))
+            );
         }
+
+        Err(Error::new(
+            ErrorKind::InvalidInput,
+            "A single path must be a directory, a CSV file, or a supported archive \
+                 (.zip, .tar, .tar.gz, .tgz, .tar.bz2, .tbz, .tbz2)",
+        ))
     }
 
     /// Select the language and keep only the files of that language.
