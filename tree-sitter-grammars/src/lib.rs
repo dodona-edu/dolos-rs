@@ -306,7 +306,7 @@ impl Language {
             #[cfg(feature = "lang-r")]
             Language::R => Grammar {
                 names: &["r"],
-                extensions: &["r", "rdata", "rds", "rda"],
+                extensions: &["r"],
                 tree_sitter: tree_sitter_r::LANGUAGE,
             },
             #[cfg(feature = "lang-ruby")]
@@ -318,7 +318,7 @@ impl Language {
             #[cfg(feature = "lang-rust")]
             Language::Rust => Grammar {
                 names: &["rust"],
-                extensions: &["rs", "rlib"],
+                extensions: &["rs"],
                 tree_sitter: tree_sitter_rust::LANGUAGE,
             },
             #[cfg(feature = "lang-scala")]

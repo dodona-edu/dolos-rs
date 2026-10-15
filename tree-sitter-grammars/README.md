@@ -32,9 +32,9 @@ individual `tree-sitter-*` crates.
 | Perl       | `lang-perl`        | `.pl`, `.pm`, `.t`                              | `perl`                    |
 | PHP        | `lang-php`         | `.php`, `.php3`, `.php4`, `.php5`, `.php7`, `.phps`, `.phpt`, `.phtml` | `php`                     |
 | Python     | `lang-python`      | `.py`, `.py3`                                   | `python`, `py`            |
-| R          | `lang-r`           | `.r`, `.rdata`, `.rds`, `.rda`                  | `r`                       |
+| R          | `lang-r`           | `.r`                                            | `r`                       |
 | Ruby       | `lang-ruby`        | `.rb`, `.rbw`                                   | `ruby`                    |
-| Rust       | `lang-rust`        | `.rs`, `.rlib`                                  | `rust`                    |
+| Rust       | `lang-rust`        | `.rs`                                           | `rust`                    |
 | Scala      | `lang-scala`       | `.scala`, `.sc`                                 | `scala`                   |
 | SQL        | `lang-sql`         | `.sql`                                          | `sql`                     |
 | Swift      | `lang-swift`       | `.swift`                                        | `swift`                   |
