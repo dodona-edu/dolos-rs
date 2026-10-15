@@ -40,8 +40,8 @@ impl Dataset {
             )),
             [path] => Self::from_single_path(path, language),
             _ => {
-                let (name, files) = resolve::from_files(paths)?;
-                Self::new(name, FileSet::new(PathBuf::new(), files), None, language)
+                let files = resolve::from_files(paths)?;
+                Self::new(None, FileSet::new(PathBuf::new(), files), None, language)
             }
         }
     }
@@ -50,18 +50,18 @@ impl Dataset {
         if path.is_dir() {
             // directory
             let (name, files) = resolve::from_directory(path)?;
-            Self::new(name, FileSet::new(path, files), None, language)
+            Self::new(Some(name), FileSet::new(path, files), None, language)
         } else if path.extension().is_some_and(|ext| ext == "csv") {
             // CSV file
             let (name, files) = resolve::from_csv(path)?;
             let base_dir = path.parent().unwrap_or(Path::new("."));
-            Self::new(name, FileSet::new(base_dir, files), None, language)
+            Self::new(Some(name), FileSet::new(base_dir, files), None, language)
         } else if let Some(extracted) = archive::try_extract(path)? {
             // archive
             let dir = extracted.temp_dir.path();
             let (_, files) = resolve::from_directory(dir)?;
             Self::new(
-                extracted.name,
+                Some(extracted.name),
                 FileSet::new(dir, files),
                 Some(extracted.temp_dir),
                 language,
@@ -76,11 +76,12 @@ impl Dataset {
     }
 
     /// Select the language and keep only the files of that language.
+    /// Without a `name`, the dataset is named after the files that remain.
     ///
     /// # Errors
     /// Fails when the language cannot be detected or fewer than 2 files remain.
     fn new(
-        name: String,
+        name: Option<String>,
         mut file_set: FileSet,
         temp_dir: Option<TempDir>,
         language: Option<Language>,
@@ -98,6 +99,7 @@ impl Dataset {
             ));
         }
 
+        let name = name.unwrap_or_else(|| resolve::files_name(&file_set.relative_paths));
         Ok(Self { name, file_set, language, _temp_dir: temp_dir })
     }
 }
@@ -143,6 +145,20 @@ mod tests {
         .unwrap();
         assert_eq!(dataset.name, "3 files");
         assert_eq!(dataset.file_set.relative_paths.len(), 3);
+    }
+
+    #[test]
+    fn name_for_files_after_filtering() {
+        let dataset = Dataset::create(
+            vec![
+                "fixtures/sample1.js".into(),
+                "fixtures/sample2.js".into(),
+                "fixtures/sample1.py".into(),
+            ],
+            None,
+        )
+        .unwrap();
+        assert_eq!(dataset.name, "sample1.js-sample2.js");
     }
 
     #[test]
