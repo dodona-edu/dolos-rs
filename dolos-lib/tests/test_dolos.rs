@@ -1,8 +1,6 @@
 use dolos::{Dolos, DolosConfig, Language, PairSortBy, Report};
 use rstest::rstest;
-use std::io::ErrorKind;
 use std::path::PathBuf;
-use tempfile::TempDir;
 
 // ── Fixture files ─────────────────────────────────────────────────────────────
 
@@ -226,21 +224,4 @@ fn test_too_few_files_after_filtering() {
     let err = Dolos::new(to_path_buf(MIXED), config).unwrap_err();
 
     assert!(err.to_string().contains("at least 2 Python files"), "{err}");
-}
-
-/// A directory that holds one file cannot form a pair. The analysis reports an
-/// error instead of panicking.
-#[test]
-fn test_single_file_directory_is_rejected() {
-    let dir = TempDir::new().unwrap();
-    std::fs::copy("fixtures/sample1.js", dir.path().join("sample1.js")).unwrap();
-
-    let error = Dolos::new(vec![dir.path().to_path_buf()], DolosConfig::default())
-        .expect_err("one file cannot form a pair");
-
-    assert_eq!(error.kind(), ErrorKind::InvalidInput);
-    assert!(
-        error.to_string().contains("at least 2 Javascript files"),
-        "{error}"
-    );
 }

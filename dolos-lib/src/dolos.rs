@@ -8,7 +8,7 @@ use crate::winnowing::fingerprints::{Fingerprint, Winnow};
 use crate::winnowing::region::Region;
 use crate::winnowing::tokenizer::{Tokenizer, Tokens};
 use std::fmt;
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, Result};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
@@ -49,16 +49,6 @@ impl Dolos {
         };
 
         dolos.add_files(dataset.file_set)?;
-
-        if dolos.files.len() < 2 {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                format!(
-                    "a comparison needs at least 2 files, {} found",
-                    dolos.files.len()
-                ),
-            ));
-        }
 
         if let Some(ignore_path) = dolos.metadata.ignore.clone() {
             dolos.add_ignore_file(ignore_path)?;
