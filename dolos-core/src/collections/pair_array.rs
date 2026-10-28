@@ -2,7 +2,11 @@ use std::ops::{Index, IndexMut};
 
 use crate::collections::utils::ordered_pair;
 
-/// A symmetric pair array that stores values for pairs (i, j) where i < j.
+/// One value for every unordered pair of items.
+///
+/// The items are the sequences of an analysis, indexed by their position in
+/// the input. `(i, j)` and `(j, i)` name the same pair. An item does not form a
+/// pair with itself.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PairArray<T> {
     data: Vec<T>,
@@ -33,8 +37,27 @@ impl<T> PairArray<T> {
         Some(min * (2 * self.item_count - min - 1) / 2 + (max - min - 1))
     }
 
-    /// Returns the value at position (i, j), or `None` when `i == j` or either
-    /// index is out of range.
+    /// Returns the value of the pair of items `i` and `j`, or `None` when
+    /// `i == j` or when `i` or `j` is not below [`item_count`](Self::item_count).
+    ///
+    /// The order of `i` and `j` does not matter.
+    ///
+    /// # Parameters
+    ///
+    /// - `i`, `j`: two item indices.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use dolos_core::{AnalysisOptions, analyze};
+    /// # let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
+    /// let result = analyze(&[vec![1, 2], vec![1, 2], vec![3]], None, &options)?;
+    ///
+    /// assert_eq!(result.metrics().get(0, 1).map(|m| m.longest_match), Some(2));
+    /// assert_eq!(result.metrics().get(1, 0).map(|m| m.longest_match), Some(2));
+    /// assert_eq!(result.metrics().get(1, 1), None);
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     pub fn get(&self, i: usize, j: usize) -> Option<&T> {
         self.index(i, j).map(|idx| &self.data[idx])
     }
@@ -45,26 +68,74 @@ impl<T> PairArray<T> {
         self.index(i, j).map(|idx| &mut self.data[idx])
     }
 
-    /// Returns the number of items being pairwise matched.
+    /// Returns the number of items. For an analysis, this is the number of
+    /// sequences.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use dolos_core::{AnalysisOptions, analyze};
+    /// # let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
+    /// let result = analyze(&[vec![1, 2], vec![1, 2], vec![3]], None, &options)?;
+    ///
+    /// assert_eq!(result.metrics.item_count(), 3);
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     #[inline]
     pub fn item_count(&self) -> usize {
         self.item_count
     }
 
-    /// Returns the number of stored pairs.
+    /// Returns the number of pairs: `n * (n - 1) / 2` for `n` items.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use dolos_core::{AnalysisOptions, analyze};
+    /// # let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
+    /// let result = analyze(&[vec![1, 2], vec![1, 2], vec![3]], None, &options)?;
+    ///
+    /// assert_eq!(result.metrics.pair_count(), 3);
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     #[inline]
     pub fn pair_count(&self) -> usize {
         self.data.len()
     }
 
-    /// Returns whether no pair is stored, which is the case for fewer than two
-    /// items.
+    /// Returns `true` when the array holds no pair, which is the case for fewer
+    /// than two items.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use dolos_core::{AnalysisOptions, analyze};
+    /// # let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
+    /// let result = analyze(&[vec![1, 2], vec![3]], None, &options)?;
+    ///
+    /// assert!(!result.metrics.is_empty());
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()
     }
 
-    /// Returns an iterator over all pairs with their indices.
+    /// Returns an iterator over all pairs as `(i, j, value)` with `i < j`.
+    ///
+    /// The pairs come in the order `(0, 1)`, `(0, 2)`, ..., `(1, 2)`, ...
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use dolos_core::{AnalysisOptions, analyze};
+    /// # let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
+    /// let result = analyze(&[vec![1, 2], vec![1, 2], vec![3]], None, &options)?;
+    ///
+    /// let pairs: Vec<_> = result.metrics.iter_pairs().map(|(i, j, _)| (i, j)).collect();
+    /// assert_eq!(pairs, [(0, 1), (0, 2), (1, 2)]);
+    /// # Ok::<(), std::io::Error>(())
+    /// ```
     pub fn iter_pairs(&self) -> impl Iterator<Item = (usize, usize, &T)> {
         pair_indices(self.item_count)
             .zip(self.data.iter())
