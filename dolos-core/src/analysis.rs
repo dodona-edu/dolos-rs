@@ -22,10 +22,11 @@ pub struct AnalysisOptions {
 
 /// Compare all sequences pairwise.
 ///
-/// The analysis finds the maximal exact matches between every pair of
-/// sequences, and derives the [`PairMetrics`](crate::PairMetrics) of the pair
-/// from them. With [`keep_matches`](AnalysisOptions::keep_matches), the result
-/// also holds the matches themselves.
+/// The analysis finds the exact matches between every pair of sequences: the
+/// maximal matches, cut at ignored positions. It derives the
+/// [`PairMetrics`](crate::PairMetrics) of the pair from them. With
+/// [`keep_matches`](AnalysisOptions::keep_matches), the result also holds the
+/// matches themselves.
 ///
 /// # Parameters
 ///

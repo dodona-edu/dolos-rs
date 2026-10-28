@@ -104,18 +104,8 @@ impl<T> PairArray<T> {
     }
 
     /// Returns `true` when the array holds no pair, which is the case for fewer
-    /// than two items.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # use dolos_core::{AnalysisOptions, analyze};
-    /// # let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
-    /// let result = analyze(&[vec![1, 2], vec![3]], None, &options)?;
-    ///
-    /// assert!(!result.metrics.is_empty());
-    /// # Ok::<(), std::io::Error>(())
-    /// ```
+    /// than two items. An array from [`analyze`](crate::analyze) is never
+    /// empty, because `analyze` needs at least two sequences.
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.data.is_empty()

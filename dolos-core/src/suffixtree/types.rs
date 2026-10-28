@@ -29,7 +29,8 @@ impl StartPosition {
     }
 }
 
-/// A maximal exact match between the two sequences of a pair.
+/// An exact match between the two sequences of a pair: a maximal match, cut at
+/// ignored positions.
 ///
 /// The left sequence is the one with the smaller index, the right sequence the
 /// one with the larger index. The offsets are positions in the input
