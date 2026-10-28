@@ -13,10 +13,12 @@ impl<T: Clone> PairArray<T> {
     /// Creates a new `PairArray` for `item_count` items, initializing every
     /// pair's value to `default`. For `n` items there are `n * (n - 1) / 2`
     /// unique unordered pairs stored.
-    pub fn new(item_count: usize, default: T) -> Self {
+    pub(crate) fn new(item_count: usize, default: T) -> Self {
         Self { data: vec![default; pair_count(item_count)], item_count }
     }
+}
 
+impl<T> PairArray<T> {
     /// Converts pair indices to linear index.
     #[inline]
     fn index(&self, i: usize, j: usize) -> usize {
@@ -34,13 +36,13 @@ impl<T: Clone> PairArray<T> {
     }
 
     /// Returns a mutable reference to the value at position (i, j).
-    pub fn get_mut(&mut self, i: usize, j: usize) -> &mut T {
+    pub(crate) fn get_mut(&mut self, i: usize, j: usize) -> &mut T {
         let idx = self.index(i, j);
         &mut self.data[idx]
     }
 
     /// Sets the value at position (i, j).
-    pub fn set(&mut self, i: usize, j: usize, value: T) {
+    pub(crate) fn set(&mut self, i: usize, j: usize, value: T) {
         let idx = self.index(i, j);
         self.data[idx] = value;
     }
@@ -71,9 +73,27 @@ impl<T: Clone> PairArray<T> {
             .map(|((i, j), value)| (i, j, value))
     }
 
+    /// Returns an iterator over all pairs with their indices, consuming the array.
+    pub fn into_iter_pairs(self) -> impl Iterator<Item = (usize, usize, T)> {
+        pair_indices(self.item_count)
+            .zip(self.data)
+            .map(|((i, j), value)| (i, j, value))
+    }
+
+    /// Returns a new array with `f` applied to every pair.
+    pub fn map<U>(&self, mut f: impl FnMut(usize, usize, &T) -> U) -> PairArray<U> {
+        PairArray {
+            data: self
+                .iter_pairs()
+                .map(|(i, j, value)| f(i, j, value))
+                .collect(),
+            item_count: self.item_count,
+        }
+    }
+
     /// Returns an iterator over all pairs with their indices, allowing the
     /// values to be modified.
-    pub fn iter_pairs_mut(&mut self) -> impl Iterator<Item = (usize, usize, &mut T)> {
+    pub(crate) fn iter_pairs_mut(&mut self) -> impl Iterator<Item = (usize, usize, &mut T)> {
         pair_indices(self.item_count)
             .zip(self.data.iter_mut())
             .map(|((i, j), value)| (i, j, value))
@@ -112,6 +132,28 @@ mod tests {
         assert_eq!(
             arr.iter_pairs().map(|(_, _, &v)| v).collect::<Vec<_>>(),
             [1, 2, 12]
+        );
+    }
+
+    #[test]
+    fn map_keeps_every_pair_at_its_indices() {
+        let mut arr = PairArray::new(3, 0);
+        arr.set(1, 2, 5);
+
+        let mapped = arr.map(|i, j, &value| (i, j, value * 2));
+
+        assert_eq!(*mapped.get(2, 1), (1, 2, 10));
+    }
+
+    #[test]
+    fn into_iter_pairs_yields_every_pair_in_storage_order() {
+        let arr = PairArray::new(3, 0);
+
+        assert_eq!(
+            arr.into_iter_pairs()
+                .map(|(i, j, _)| (i, j))
+                .collect::<Vec<_>>(),
+            [(0, 1), (0, 2), (1, 2)]
         );
     }
 
