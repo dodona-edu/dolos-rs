@@ -347,7 +347,7 @@ mod tests {
     #[case::language(&["-l", "notalang"])]
     #[case::sort_by(&["--sort-by", "bogus"])]
     #[case::port_zero(&["-p", "0"])]
-    fn parse_rejects_unknown_values(#[case] extra: &[&str]) {
+    fn parse_rejects_invalid_values(#[case] extra: &[&str]) {
         assert!(parse(extra).is_err());
     }
 
