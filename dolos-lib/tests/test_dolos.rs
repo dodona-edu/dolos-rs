@@ -280,8 +280,27 @@ fn template_shows_up_as_ignored_intervals() {
             ignored < data.fingerprints.len(),
             "everything is ignored in {path}"
         );
-        // The intervals are maximal runs, so they never touch.
-        assert!(data.ignored.windows(2).all(|w| w[0].end < w[1].start));
+    }
+}
+
+// The intervals are maximal runs, so they never touch.
+#[test]
+fn ignored_intervals_never_touch() {
+    let config = DolosConfig::builder()
+        .include_analysis_data(true)
+        .ignore(IGNORE)
+        .build()
+        .unwrap();
+    let report = report(SAMPLE12, config);
+
+    for file in &report.files {
+        let data = analysis_data(file);
+
+        assert!(
+            data.ignored.windows(2).all(|w| w[0].end < w[1].start),
+            "two intervals touch in {}",
+            file.relative_path.display()
+        );
     }
 }
 
