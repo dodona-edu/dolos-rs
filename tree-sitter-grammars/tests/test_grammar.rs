@@ -109,17 +109,25 @@ fn from_name_resolves_the_name(#[case] name: &str, #[case] lang: Language) {
 }
 
 #[test]
-fn unknown_extension_and_name_resolve_to_nothing() {
+fn from_path_ignores_an_unknown_extension() {
     assert!(Language::from_path(Path::new("file.xyz")).is_empty());
+}
+
+#[test]
+fn from_name_ignores_an_unknown_name() {
     assert_eq!(Language::from_name("unknown"), None);
 }
 
 #[test]
-fn extension_and_name_are_case_insensitive() {
+fn from_path_ignores_case() {
     assert_eq!(
         Language::from_path(Path::new("Main.PY")),
         vec![Language::Python]
     );
+}
+
+#[test]
+fn from_name_ignores_case() {
     assert_eq!(Language::from_name("PYTHON"), Some(Language::Python));
 }
 
