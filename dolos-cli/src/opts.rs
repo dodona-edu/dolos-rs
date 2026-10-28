@@ -269,26 +269,21 @@ pub enum Command {
 mod tests {
     use super::*;
 
-    /// Build a full `dolos run a.js b.js [extra...]` argv and attempt to parse it.
+    /// Parse `dolos run a.js b.js [extra...]`.
     fn parse(extra: &[&str]) -> Result<Opts, clap::Error> {
         let mut args = vec!["dolos", "run", "a.js", "b.js"];
         args.extend_from_slice(extra);
         Opts::try_parse_from(args)
     }
 
-    /// Parse options then convert `DolosArgs` to `DolosConfig`.
-    ///
-    /// Panics if clap rejects the argv; only builder validation is expected
-    /// to produce an `Err` here.
+    /// The `DolosConfig` of the parsed options. Panics if clap rejects them.
     fn config(extra: &[&str]) -> std::io::Result<DolosConfig> {
         match parse(extra).unwrap().command {
             Command::Run { dolos_args, .. } => dolos_args.try_into(),
         }
     }
 
-    /// Parse options and return the `OutputArgs`.
-    ///
-    /// Panics if clap rejects the argv.
+    /// The `OutputArgs` of the parsed options. Panics if clap rejects them.
     fn output(extra: &[&str]) -> OutputArgs {
         match parse(extra).unwrap().command {
             Command::Run { output_args, .. } => output_args,
@@ -296,12 +291,12 @@ mod tests {
     }
 
     #[test]
-    fn test_default() {
+    fn run_without_options_uses_the_defaults() {
         assert_eq!(config(&[]).unwrap(), DolosConfig::default());
     }
 
     #[test]
-    fn test_update_options() {
+    fn run_options_set_the_config() {
         #[rustfmt::skip]
         let cfg = config(&[
             "-k", "10",
@@ -338,29 +333,23 @@ mod tests {
     }
 
     #[test]
-    fn test_errors() {
-        assert!(config(&["-k", "0"]).is_err(), "-k 0 must be rejected");
-        assert!(config(&["-w", "0"]).is_err(), "-w 0 must be rejected");
-        assert!(config(&["-s", "0"]).is_err(), "-s 0 must be rejected");
-        assert!(config(&["-m", "0"]).is_err(), "-m 0 must be rejected");
-        assert!(config(&["-M", "1.5"]).is_err(), "-M 1.5 must be rejected");
-        assert!(
-            parse(&["-l", "notalang"]).is_err(),
-            "-l notalang should fail"
-        );
-        assert!(
-            parse(&["--sort-by", "bogus"]).is_err(),
-            "--sort-by bogus should fail"
-        );
-        // No input files → clap requires at least one
-        assert!(
-            Opts::try_parse_from(["dolos", "run"]).is_err(),
-            "missing files should fail"
-        );
+    fn invalid_options_are_rejected() {
+        assert!(config(&["-k", "0"]).is_err());
+        assert!(config(&["-w", "0"]).is_err());
+        assert!(config(&["-s", "0"]).is_err());
+        assert!(config(&["-m", "0"]).is_err());
+        assert!(config(&["-M", "1.5"]).is_err());
+        assert!(parse(&["-l", "notalang"]).is_err());
+        assert!(parse(&["--sort-by", "bogus"]).is_err());
     }
 
     #[test]
-    fn test_output_options() {
+    fn run_without_files_is_rejected() {
+        assert!(Opts::try_parse_from(["dolos", "run"]).is_err());
+    }
+
+    #[test]
+    fn output_options_are_parsed() {
         let default = output(&[]);
         assert_eq!(default.output_format, OutputFormat::Terminal);
         assert_eq!(default.port, 3000);
@@ -380,6 +369,6 @@ mod tests {
         assert_eq!(args.host, "0.0.0.0");
         assert!(args.open_browser);
 
-        assert!(parse(&["-p", "0"]).is_err(), "-p 0 must be rejected");
+        assert!(parse(&["-p", "0"]).is_err());
     }
 }

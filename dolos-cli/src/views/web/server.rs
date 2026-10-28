@@ -60,10 +60,8 @@ mod tests {
     use axum::http::{Request, StatusCode};
     use tower::ServiceExt;
 
-    /// `/data` serves the report files, `/` serves the frontend `index.html`, and
-    /// an unknown path returns 404.
     #[tokio::test]
-    async fn test_routes() {
+    async fn router_serves_the_report_and_the_frontend() {
         let report_dir = tempfile::TempDir::new().unwrap();
         std::fs::write(report_dir.path().join("pairs.csv"), "file1_id\n").unwrap();
         let webroot = tempfile::TempDir::new().unwrap();
