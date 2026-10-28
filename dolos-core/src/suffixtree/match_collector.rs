@@ -116,7 +116,6 @@ impl<'a> MatchCollector<'a> {
     /// Where the overlaps are the number of positions covered by at least one
     /// shared match, and the totals exclude ignored positions.
     fn build_metrics(&self) -> PairArray<PairMetrics> {
-        let mut metrics = PairArray::new(self.sequences.len(), PairMetrics::default());
         let totals: Vec<usize> = self
             .sequences
             .iter()
@@ -129,40 +128,28 @@ impl<'a> MatchCollector<'a> {
             })
             .collect();
 
-        for i in 0..self.sequences.len() {
-            for j in (i + 1)..self.sequences.len() {
-                let (total_left, total_right) = (totals[i], totals[j]);
-                let overlap_left = self.overlap_bitmap.item(i, j, i).count_ones();
-                let overlap_right = self.overlap_bitmap.item(i, j, j).count_ones();
-                let longest_match = *self
-                    .longest_matches
-                    .get(i, j)
-                    .expect("i < j < sequence count");
+        self.longest_matches.map(|i, j, &longest_match| {
+            let (total_left, total_right) = (totals[i], totals[j]);
+            let overlap_left = self.overlap_bitmap.item(i, j, i).count_ones();
+            let overlap_right = self.overlap_bitmap.item(i, j, j).count_ones();
 
-                let total_overlap = overlap_left + overlap_right;
-                let total_length = total_left + total_right;
+            let total_overlap = overlap_left + overlap_right;
+            let total_length = total_left + total_right;
 
-                let similarity = if total_length == 0 {
-                    0.0
-                } else {
-                    total_overlap as f64 / total_length as f64
-                };
+            let similarity = if total_length == 0 {
+                0.0
+            } else {
+                total_overlap as f64 / total_length as f64
+            };
 
-                metrics.set(
-                    i,
-                    j,
-                    PairMetrics {
-                        similarity,
-                        total_left,
-                        total_right,
-                        overlap_left,
-                        overlap_right,
-                        longest_match,
-                    },
-                );
+            PairMetrics {
+                similarity,
+                total_left,
+                total_right,
+                overlap_left,
+                overlap_right,
+                longest_match,
             }
-        }
-
-        metrics
+        })
     }
 }
