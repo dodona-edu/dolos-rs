@@ -85,9 +85,8 @@ fn analysis_data_columns_are_empty_by_default() {
     }
 }
 
-// Every fingerprint has four region numbers.
 #[test]
-fn analysis_data_columns_hold_numbers() {
+fn analysis_data_columns_hold_four_region_numbers_per_fingerprint() {
     let tmp = TempDir::new().unwrap();
     let report_dir = csv_report(&tmp, &["--include-analysis-data"]);
 

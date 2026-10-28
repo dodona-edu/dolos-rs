@@ -60,6 +60,12 @@ mod tests {
     use axum::http::{Request, StatusCode};
     use tower::ServiceExt;
 
+    /// The status code of a GET request on `path`.
+    async fn status(router: &Router, path: &str) -> StatusCode {
+        let request = Request::builder().uri(path).body(Body::empty()).unwrap();
+        router.clone().oneshot(request).await.unwrap().status()
+    }
+
     #[tokio::test]
     async fn router_serves_the_report_and_the_frontend() {
         let report_dir = tempfile::TempDir::new().unwrap();
@@ -68,24 +74,20 @@ mod tests {
         std::fs::write(webroot.path().join("index.html"), "<html></html>").unwrap();
         let router = build_router(report_dir.path(), webroot.path());
 
-        let get = |path: &str| {
-            router
-                .clone()
-                .oneshot(Request::builder().uri(path).body(Body::empty()).unwrap())
-        };
+        assert_eq!(status(&router, "/data/pairs.csv").await, StatusCode::OK);
+        assert_eq!(status(&router, "/").await, StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn router_returns_not_found_for_unknown_paths() {
+        let report_dir = tempfile::TempDir::new().unwrap();
+        let webroot = tempfile::TempDir::new().unwrap();
+        let router = build_router(report_dir.path(), webroot.path());
 
         assert_eq!(
-            get("/data/pairs.csv").await.unwrap().status(),
-            StatusCode::OK
-        );
-        assert_eq!(
-            get("/data/missing.csv").await.unwrap().status(),
+            status(&router, "/data/missing.csv").await,
             StatusCode::NOT_FOUND
         );
-        assert_eq!(get("/").await.unwrap().status(), StatusCode::OK);
-        assert_eq!(
-            get("/missing").await.unwrap().status(),
-            StatusCode::NOT_FOUND
-        );
+        assert_eq!(status(&router, "/missing").await, StatusCode::NOT_FOUND);
     }
 }

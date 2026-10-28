@@ -237,7 +237,6 @@ mod tests {
         );
     }
 
-    // Regression: line numbers are file rows, not indices into the displayed slice.
     #[test]
     fn collect_display_lines_numbers_lines_by_file_row() {
         let lines = vec!["l0", "l1", "l2", "l3", "l4", "l5"];
@@ -288,19 +287,23 @@ mod tests {
     }
 
     #[test]
-    fn backwards_region_does_not_panic() {
-        colored::control::set_override(false);
+    fn collect_display_lines_collapses_a_backwards_region_onto_its_end_row() {
         let lines = vec!["l0", "l1", "l2"];
         let region = Region::new(Point::new(2, 1), Point::new(1, 0));
-        let display = collect_display_lines(&lines, &region);
+        let backwards = Range { start: 1, end: 0 };
 
-        // The region collapses onto its end row, and nothing panics.
-        assert_eq!(display.len(), 3);
-        assert_eq!(display[1].line_number, 2);
-        assert!(display[1].highlight.is_some());
+        assert_eq!(
+            rows(&collect_display_lines(&lines, &region)),
+            [(1, "l0", None), (2, "l1", Some(backwards)), (3, "l2", None)]
+        );
+    }
 
+    #[test]
+    fn format_accepts_a_backwards_highlight() {
+        colored::control::set_override(false);
         let backwards = Range { start: 4, end: 2 };
         let line = DisplayLine { line_number: 1, code: "abcdef", highlight: Some(backwards) };
+
         assert_eq!(line.format(1, 6), vec!["1 abcdef"]);
     }
 

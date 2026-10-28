@@ -268,6 +268,7 @@ pub enum Command {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
     /// Parse `dolos run a.js b.js [extra...]`.
     fn parse(extra: &[&str]) -> Result<Opts, clap::Error> {
@@ -332,15 +333,22 @@ mod tests {
         assert_eq!(cfg, expected);
     }
 
-    #[test]
-    fn invalid_options_are_rejected() {
-        assert!(config(&["-k", "0"]).is_err());
-        assert!(config(&["-w", "0"]).is_err());
-        assert!(config(&["-s", "0"]).is_err());
-        assert!(config(&["-m", "0"]).is_err());
-        assert!(config(&["-M", "1.5"]).is_err());
-        assert!(parse(&["-l", "notalang"]).is_err());
-        assert!(parse(&["--sort-by", "bogus"]).is_err());
+    #[rstest]
+    #[case::k_zero(&["-k", "0"])]
+    #[case::w_zero(&["-w", "0"])]
+    #[case::s_zero(&["-s", "0"])]
+    #[case::m_zero(&["-m", "0"])]
+    #[case::big_percentage(&["-M", "1.5"])]
+    fn config_rejects_out_of_range_values(#[case] extra: &[&str]) {
+        assert!(config(extra).is_err());
+    }
+
+    #[rstest]
+    #[case::language(&["-l", "notalang"])]
+    #[case::sort_by(&["--sort-by", "bogus"])]
+    #[case::port_zero(&["-p", "0"])]
+    fn parse_rejects_unknown_values(#[case] extra: &[&str]) {
+        assert!(parse(extra).is_err());
     }
 
     #[test]
@@ -349,13 +357,16 @@ mod tests {
     }
 
     #[test]
-    fn output_options_are_parsed() {
-        let default = output(&[]);
-        assert_eq!(default.output_format, OutputFormat::Terminal);
-        assert_eq!(default.port, 3000);
-        assert_eq!(default.host, "localhost");
-        assert!(!default.open_browser);
+    fn run_without_output_options_uses_the_defaults() {
+        let args = output(&[]);
+        assert_eq!(args.output_format, OutputFormat::Terminal);
+        assert_eq!(args.port, 3000);
+        assert_eq!(args.host, "localhost");
+        assert!(!args.open_browser);
+    }
 
+    #[test]
+    fn output_options_set_the_output_args() {
         #[rustfmt::skip]
         let args = output(&[
             "-f", "web",
@@ -368,7 +379,5 @@ mod tests {
         assert_eq!(args.port, 8080);
         assert_eq!(args.host, "0.0.0.0");
         assert!(args.open_browser);
-
-        assert!(parse(&["-p", "0"]).is_err());
     }
 }
