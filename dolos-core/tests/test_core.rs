@@ -64,12 +64,19 @@ fn every_pair_is_reported_once_in_index_order() {
 }
 
 #[test]
-fn keep_matches_off_leaves_out_the_matches_but_not_the_metrics() {
+fn keep_matches_off_leaves_out_the_matches() {
+    let sequences = vec![vec![1, 2, 3, 4], vec![9, 2, 3, 4]];
+    let result = analyze(&sequences, None, &options(1, false)).unwrap();
+
+    assert!(result.matches.is_none());
+}
+
+#[test]
+fn keep_matches_does_not_change_the_metrics() {
     let sequences = vec![vec![1, 2, 3, 4], vec![9, 2, 3, 4]];
     let with = analyze(&sequences, None, &options(1, true)).unwrap();
     let without = analyze(&sequences, None, &options(1, false)).unwrap();
 
-    assert!(without.matches.is_none());
     assert_eq!(metrics(&without, 0, 1), metrics(&with, 0, 1));
 }
 
