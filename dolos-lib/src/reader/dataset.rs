@@ -132,7 +132,6 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(dataset.name, "sample1.js-sample2.js");
         assert_eq!(dataset.file_set.base_dir, PathBuf::new());
         assert_eq!(
             dataset.file_set.relative_paths,

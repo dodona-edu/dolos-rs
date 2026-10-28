@@ -69,7 +69,7 @@ fn pair_sim(files: &[&str], config: DolosConfig) -> f64 {
             (lf == Some("sample1.js") && rf == Some("sample2.js"))
                 || (lf == Some("sample2.js") && rf == Some("sample1.js"))
         })
-        .expect("no pair (sample1.js, sample2.js) in the report")
+        .expect("the report holds the pair (sample1.js, sample2.js)")
         .metrics
         .similarity
 }
@@ -113,7 +113,7 @@ fn analysis_data(file: &File) -> &AnalysisData {
 #[case::inert_ignore(SAMPLE12, DolosConfig::builder().ignore(IGNORE_INERT).build().unwrap(), 0.4803921568627451)]
 #[case::cap_below_one_file(SAMPLE123, DolosConfig::builder().max_fingerprint_percentage(0.1).build().unwrap(), 0.0)]
 #[case::cap_at_file_count(SAMPLE123, DolosConfig::builder().max_fingerprint_count(3).build().unwrap(), 0.4803921568627451)]
-fn similarity_matches_the_expected_value(
+fn config_gives_the_expected_similarity(
     #[case] files: &[&str],
     #[case] config: DolosConfig,
     #[case] expected_sim: f64,
@@ -228,7 +228,6 @@ fn analysis_data_is_absent_by_default() {
     }
 }
 
-// Nothing is ignored without a template or a cap.
 #[test]
 fn analysis_data_holds_a_region_per_fingerprint() {
     let config = DolosConfig::builder()
@@ -243,7 +242,19 @@ fn analysis_data_holds_a_region_per_fingerprint() {
 
         assert!(!data.fingerprints.is_empty());
         assert_eq!(data.fingerprints.len(), data.regions.len());
-        assert!(data.ignored.is_empty());
+    }
+}
+
+#[test]
+fn analysis_data_ignores_nothing_without_a_template_or_cap() {
+    let config = DolosConfig::builder()
+        .include_analysis_data(true)
+        .build()
+        .unwrap();
+    let report = report(SAMPLE123, config);
+
+    for file in &report.files {
+        assert!(analysis_data(file).ignored.is_empty());
     }
 }
 
@@ -269,13 +280,30 @@ fn template_shows_up_as_ignored_intervals() {
             ignored < data.fingerprints.len(),
             "everything is ignored in {path}"
         );
+        // The intervals are maximal runs, so they never touch.
+        assert!(data.ignored.windows(2).all(|w| w[0].end < w[1].start));
+    }
+}
+
+#[test]
+fn ignored_intervals_stay_inside_the_file() {
+    let config = DolosConfig::builder()
+        .include_analysis_data(true)
+        .ignore(IGNORE)
+        .build()
+        .unwrap();
+    let report = report(SAMPLE12, config);
+
+    for file in &report.files {
+        let data = analysis_data(file);
+
         assert!(
             data.ignored
                 .iter()
-                .all(|r| r.end <= data.fingerprints.len())
+                .all(|r| r.end <= data.fingerprints.len()),
+            "an interval ends past the fingerprints in {}",
+            file.relative_path.display()
         );
-        // The intervals are maximal runs, so they never touch.
-        assert!(data.ignored.windows(2).all(|w| w[0].end < w[1].start));
     }
 }
 

@@ -13,7 +13,7 @@ pub struct ExtractionResult {
 }
 
 pub fn try_extract(path: &Path) -> Result<Option<ExtractionResult>> {
-    let Some((format, name)) = archive_name(path) else {
+    let Some((format, name)) = detect_archive(path) else {
         return Ok(None);
     };
     let temp_dir = tempdir()?;
@@ -21,8 +21,8 @@ pub fn try_extract(path: &Path) -> Result<Option<ExtractionResult>> {
     Ok(Some(ExtractionResult { name, temp_dir }))
 }
 
-/// The archive format of `path` and its file name without the archive extension.
-fn archive_name(path: &Path) -> Option<(Format, String)> {
+/// Detects the archive format of `path` and its file name without the archive extension.
+fn detect_archive(path: &Path) -> Option<(Format, String)> {
     let (format, ext) = Format::detect(path)?;
     let raw = path
         .file_name()
@@ -87,8 +87,8 @@ mod tests {
     #[case::tar_bz2("dataset.tar.bz2")]
     #[case::tbz("dataset.tbz")]
     #[case::tbz2("dataset.tbz2")]
-    fn archive_name_strips_the_whole_extension(#[case] filename: &str) {
-        let (_, name) = archive_name(Path::new(filename)).unwrap();
+    fn detect_archive_strips_the_whole_extension(#[case] filename: &str) {
+        let (_, name) = detect_archive(Path::new(filename)).unwrap();
 
         assert_eq!(name, "dataset");
     }
