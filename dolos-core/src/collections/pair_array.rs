@@ -169,8 +169,7 @@ mod tests {
         assert_eq!(arr.get(3, 2), Some(&40));
     }
 
-    /// Each of these indices once returned the value of another pair in
-    /// release builds.
+    // Pairs (1, 3) and (2, 3) hold a value, so an index that maps to them shows up.
     #[test]
     fn indices_that_name_no_pair_return_none() {
         let mut arr = PairArray::new(4, 0);
