@@ -2,6 +2,9 @@
 name = "tree-sitter-grammars"
 version = "0.1.0"
 edition = "2024"
+description = "Tree-sitter grammars for the programming languages that Dolos supports, one `lang-*` feature per language."
+repository = "https://github.com/dodona-edu/dolos-rs"
+license = "MIT"
 
 [features]
 all-languages = [
@@ -100,6 +103,7 @@ tree-sitter-verilog = { version = "1.0.3", optional = true }
 
 [dev-dependencies]
 rstest = "0.28.0"
+tree-sitter = "=0.26.13"
 
 [[test]]
 name = "test_grammar"

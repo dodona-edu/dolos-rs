@@ -5,6 +5,18 @@
 //!
 //! For installation instructions, the full list of supported languages, and
 //! usage examples, see the [README](https://github.com/dodona-edu/dolos-rs/tree/main/tree-sitter-grammars).
+//!
+//! # Examples
+//!
+//! ```
+//! # #[cfg(feature = "lang-python")] {
+//! use tree_sitter_grammars::Language;
+//!
+//! use std::path::Path;
+//!
+//! assert_eq!(Language::from_path(Path::new("src/main.py")), [Language::Python]);
+//! # }
+//! ```
 
 use std::ffi::OsStr;
 use std::path::Path;
@@ -158,12 +170,12 @@ impl Language {
 
     /// Return the language with the name or alias `name`, ignoring case.
     ///
+    /// Returns `None` when no enabled language has that name.
+    ///
     /// # Parameters
     ///
     /// - `name`: a language name, such as `"python"`, or an alias, such as
     ///   `"golang"`.
-    ///
-    /// Returns `None` when no enabled language has that name.
     ///
     /// # Examples
     ///
@@ -185,12 +197,12 @@ impl Language {
     /// Return the languages that use the extension of `path`, ignoring case.
     ///
     /// Several languages can share an extension, such as `.h` for C and C++.
+    /// Returns an empty list when the path has no extension or the extension is
+    /// unknown.
     ///
     /// # Parameters
     ///
     /// - `path`: a file path. Only its extension counts.
-    ///
-    /// Returns an empty list when the path has no extension or the extension is unknown.
     ///
     /// # Examples
     ///
@@ -238,17 +250,21 @@ impl Language {
 
     /// Return the tree-sitter grammar of this language.
     ///
-    /// Convert it into a `tree_sitter::Language` with `.into()`, and pass that
-    /// to `tree_sitter::Parser::set_language`.
-    ///
     /// # Examples
     ///
     /// ```
     /// # #[cfg(feature = "lang-python")] {
+    /// use tree_sitter::Parser;
     /// use tree_sitter_grammars::Language;
     ///
-    /// let grammar = Language::Python.tree_sitter_language();
+    /// let mut parser = Parser::new();
+    /// parser.set_language(&Language::Python.tree_sitter_language().into())?;
+    ///
+    /// let tree = parser.parse("x = 1", None).ok_or("the parser returned no tree")?;
+    /// assert_eq!(tree.root_node().kind(), "module");
+    /// assert!(!tree.root_node().has_error());
     /// # }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn tree_sitter_language(self) -> LanguageFn {
         self.grammar().tree_sitter
