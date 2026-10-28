@@ -36,10 +36,12 @@ impl Report {
                 left_file: files[left].clone(),
                 right_file: files[right].clone(),
                 metrics: metrics.clone(),
-                fragments: fragments
-                    .as_mut()
-                    .and_then(Iterator::next)
-                    .map(|(_, _, f)| f),
+                fragments: fragments.as_mut().and_then(Iterator::next).map(
+                    |(fragment_left, fragment_right, pair_fragments)| {
+                        debug_assert_eq!((fragment_left, fragment_right), (left, right));
+                        pair_fragments
+                    },
+                ),
             })
             .collect();
 
