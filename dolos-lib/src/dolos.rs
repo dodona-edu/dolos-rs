@@ -64,10 +64,7 @@ impl Dolos {
     /// - One archive: the I/O error when the archive cannot be opened, for
     ///   example [`NotFound`]. For a zip archive, [`InvalidData`] when the file
     ///   is not a zip archive and [`Other`] when an entry cannot be extracted.
-    ///   For a tar archive, the error of the tar, gzip or bzip2 reader without
-    ///   change. Its kind depends on the reader, for example [`Other`] for a bad
-    ///   tar header, [`InvalidInput`] for a corrupt gzip or bzip2 stream and
-    ///   [`UnexpectedEof`] for an empty gzip or bzip2 file.
+    ///   For a tar archive, the I/O error of the tar, gzip or bzip2 reader.
     ///
     /// Selecting the files:
     ///
@@ -90,7 +87,6 @@ impl Dolos {
     /// [`NotFound`]: std::io::ErrorKind::NotFound
     /// [`Other`]: std::io::ErrorKind::Other
     /// [`PermissionDenied`]: std::io::ErrorKind::PermissionDenied
-    /// [`UnexpectedEof`]: std::io::ErrorKind::UnexpectedEof
     ///
     /// # Examples
     ///

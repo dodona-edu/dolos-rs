@@ -270,9 +270,9 @@ impl DolosConfigBuilder {
     ///
     /// # Parameters
     ///
-    /// - `compare`: `true` to compute fragments for every pair. With `false`,
-    ///   [`Metadata::include_fragments`](crate::Metadata::include_fragments)
-    ///   says when Dolos computes fragments. Default: `false`.
+    /// - `compare`: `true` to always compute fragments. With `false`, Dolos
+    ///   computes fragments only when there are exactly 2 files to analyze.
+    ///   Default: `false`.
     pub fn compare(mut self, compare: bool) -> Self {
         self.config.compare = compare;
         self
@@ -341,9 +341,10 @@ impl DolosConfigBuilder {
     ///
     /// ```
     /// use dolos::DolosConfig;
+    /// use std::io::ErrorKind;
     ///
-    /// let error = DolosConfig::builder().max_fingerprint_percentage(1.5).build();
-    /// assert!(error.is_err());
+    /// let result = DolosConfig::builder().max_fingerprint_percentage(1.5).build();
+    /// assert_eq!(result.unwrap_err().kind(), ErrorKind::InvalidInput);
     /// ```
     pub fn build(self) -> std::io::Result<DolosConfig> {
         Self::require_nonzero(self.config.kgram_length, "kgram_length")?;

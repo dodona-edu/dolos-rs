@@ -24,8 +24,9 @@ pub struct Metadata {
     /// The configured or the detected language of the files.
     pub language: Language,
     pub include_comments: bool,
-    /// Whether the pairs carry fragments: `true` for exactly 2 files or when
-    /// [`compare`](crate::DolosConfigBuilder::compare) is set.
+    /// Whether the pairs carry fragments. `true` when there are exactly 2
+    /// files to analyze or when
+    /// [`compare`](crate::DolosConfigBuilder::compare) is `true`.
     pub include_fragments: bool,
     /// Whether every file holds its [`AnalysisData`](crate::AnalysisData).
     pub include_analysis_data: bool,
