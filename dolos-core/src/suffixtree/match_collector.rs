@@ -134,6 +134,10 @@ impl<'a> MatchCollector<'a> {
                 let (total_left, total_right) = (totals[i], totals[j]);
                 let overlap_left = self.overlap_bitmap.item(i, j, i).count_ones();
                 let overlap_right = self.overlap_bitmap.item(i, j, j).count_ones();
+                let longest_match = *self
+                    .longest_matches
+                    .get(i, j)
+                    .expect("i < j < sequence count");
 
                 let total_overlap = overlap_left + overlap_right;
                 let total_length = total_left + total_right;
@@ -153,7 +157,7 @@ impl<'a> MatchCollector<'a> {
                         total_right,
                         overlap_left,
                         overlap_right,
-                        longest_match: *self.longest_matches.get(i, j),
+                        longest_match,
                     },
                 );
             }

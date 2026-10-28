@@ -19,32 +19,33 @@ impl<T: Clone> PairArray<T> {
 }
 
 impl<T> PairArray<T> {
-    /// Converts pair indices to linear index.
+    /// Converts pair indices to the linear index, or `None` when (i, j) names
+    /// no pair.
     #[inline]
-    fn index(&self, i: usize, j: usize) -> usize {
-        debug_assert_ne!(i, j);
-        debug_assert!(i < self.item_count, "Invalid input index 1");
-        debug_assert!(j < self.item_count, "Invalid input index 2");
+    fn index(&self, i: usize, j: usize) -> Option<usize> {
+        if i == j || i >= self.item_count || j >= self.item_count {
+            return None;
+        }
         let (min, max) = ordered_pair(i, j);
         // Formula for upper triangular index
-        min * (2 * self.item_count - min - 1) / 2 + (max - min - 1)
+        Some(min * (2 * self.item_count - min - 1) / 2 + (max - min - 1))
     }
 
-    /// Returns the value at position (i, j).
-    pub fn get(&self, i: usize, j: usize) -> &T {
-        &self.data[self.index(i, j)]
+    /// Returns the value at position (i, j), or `None` when `i == j` or either
+    /// index is out of range.
+    pub fn get(&self, i: usize, j: usize) -> Option<&T> {
+        self.index(i, j).map(|idx| &self.data[idx])
     }
 
     /// Returns a mutable reference to the value at position (i, j).
     pub fn get_mut(&mut self, i: usize, j: usize) -> &mut T {
-        let idx = self.index(i, j);
+        let idx = self.index(i, j).expect("i and j name a pair");
         &mut self.data[idx]
     }
 
     /// Sets the value at position (i, j).
     pub fn set(&mut self, i: usize, j: usize, value: T) {
-        let idx = self.index(i, j);
-        self.data[idx] = value;
+        *self.get_mut(i, j) = value;
     }
 
     /// Returns the number of items being pairwise matched.
@@ -142,7 +143,7 @@ mod tests {
 
         let mapped = arr.map(|i, j, &value| (i, j, value * 2));
 
-        assert_eq!(*mapped.get(2, 1), (1, 2, 10));
+        assert_eq!(mapped.get(2, 1), Some(&(1, 2, 10)));
     }
 
     #[test]
@@ -158,18 +159,26 @@ mod tests {
     }
 
     #[test]
-    fn symmetric_access_returns_the_same_value() {
+    fn both_index_orders_return_the_same_value() {
         let mut arr = PairArray::new(4, 0);
-        arr.set(0, 1, 10);
         arr.set(0, 2, 20);
-        arr.set(1, 2, 30);
         arr.set(2, 3, 40);
 
-        assert_eq!(*arr.get(0, 1), 10);
-        assert_eq!(*arr.get(1, 0), 10); // Symmetric access
-        assert_eq!(*arr.get(0, 2), 20);
-        assert_eq!(*arr.get(2, 0), 20);
-        assert_eq!(*arr.get(1, 2), 30);
-        assert_eq!(*arr.get(2, 3), 40);
+        assert_eq!(arr.get(0, 2), Some(&20));
+        assert_eq!(arr.get(2, 0), Some(&20));
+        assert_eq!(arr.get(3, 2), Some(&40));
+    }
+
+    /// Each of these indices once returned the value of another pair in
+    /// release builds.
+    #[test]
+    fn indices_that_name_no_pair_return_none() {
+        let mut arr = PairArray::new(4, 0);
+        arr.set(1, 3, 13);
+        arr.set(2, 3, 23);
+
+        assert_eq!(arr.get(2, 2), None);
+        assert_eq!(arr.get(1, 4), None);
+        assert_eq!(arr.get(4, 1), None);
     }
 }
