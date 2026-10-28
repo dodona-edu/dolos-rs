@@ -2,14 +2,14 @@ use std::path::PathBuf;
 use tree_sitter_grammars::Language;
 // ── Sort enums ───────────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PairSortBy {
     Similarity,
     TotalOverlap,
     LongestFragment,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FragmentSortBy {
     KgramsAscending,
     KgramsDescending,
