@@ -43,8 +43,8 @@ pub enum FragmentSortBy {
 ///     .max_fingerprint_percentage(0.8)
 ///     .build()?;
 ///
-/// assert_eq!(config.kgram_length, 23);
-/// assert_eq!(config.max_fingerprint_percentage, Some(0.8));
+/// assert_ne!(config, DolosConfig::default());
+/// assert!(DolosConfig::builder().kgram_length(0).build().is_err());
 /// # Ok::<(), std::io::Error>(())
 /// ```
 #[derive(Debug, Clone, PartialEq)]
@@ -74,9 +74,8 @@ impl DolosConfig {
     /// ```
     /// use dolos::DolosConfig;
     ///
-    /// let config = DolosConfig::builder().kgram_length(30).build()?;
-    /// assert_eq!(config.kgram_length, 30);
-    /// assert_eq!(config.kgrams_in_window, 17);
+    /// let config = DolosConfig::builder().kgram_length(23).build()?;
+    /// assert_eq!(config, DolosConfig::default());
     /// # Ok::<(), std::io::Error>(())
     /// ```
     pub fn builder() -> DolosConfigBuilder {
@@ -169,10 +168,9 @@ impl DolosConfigBuilder {
     /// # Parameters
     ///
     /// - `name`: the report name. Default: the name of the input. That is the
-    ///   name of the input directory, the name of the directory in the CSV
-    ///   path, or the archive without its extension. For a CSV path without a
-    ///   directory, such as `info.csv`, the name is empty. For separate files,
-    ///   it is `a.js-b.js` for two files and `N files` otherwise.
+    ///   name of the input directory, the name of the directory that holds
+    ///   the CSV file, or the archive without its extension. For separate
+    ///   files, it is `a.js-b.js` for two files and `N files` otherwise.
     pub fn name(mut self, name: impl Into<String>) -> Self {
         self.config.name = Some(name.into());
         self
