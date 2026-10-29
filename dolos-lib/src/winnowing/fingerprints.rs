@@ -85,6 +85,7 @@ impl Winnow for Vec<Token> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::winnowing::read_fixture;
     use crate::winnowing::region::Region;
     use crate::winnowing::tokenizer::{Tokenizer, Tokens};
     use rstest::rstest;
@@ -99,9 +100,9 @@ mod tests {
         let mut tokenizer = Tokenizer::new(Language::Javascript);
 
         let expected_hashes: Vec<usize> =
-            serde_any::from_file(format!("fixtures/sample.winnowk{k}w{w}.hashes.json")).unwrap();
+            read_fixture(format!("fixtures/sample.winnowk{k}w{w}.hashes.json"));
         let expected_locations: Vec<Region> =
-            serde_any::from_file(format!("fixtures/sample.winnowk{k}w{w}.locations.json")).unwrap();
+            read_fixture(format!("fixtures/sample.winnowk{k}w{w}.locations.json"));
 
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
         let (hashes, locations) = tokenizer.parse(&content).tokens(false).winnow(k, w, true);

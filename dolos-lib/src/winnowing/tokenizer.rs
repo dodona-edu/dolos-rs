@@ -90,6 +90,7 @@ mod tests {
     use super::*;
     use crate::winnowing::fingerprints::Winnow;
     use crate::winnowing::hashes::{RollingHash, hash_token};
+    use crate::winnowing::read_fixture;
     use crate::winnowing::region::Point;
     use std::path::Path;
 
@@ -139,7 +140,7 @@ mod tests {
 
     #[test]
     fn tokens_match_the_fixture() {
-        let expected: Vec<Token> = serde_any::from_file("fixtures/sample.tokens.json").unwrap();
+        let expected: Vec<Token> = read_fixture("fixtures/sample.tokens.json");
         let mut tokenizer = Tokenizer::new(Language::Javascript);
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
         let actual = tokenizer.parse(&content).tokens(false);
@@ -151,7 +152,7 @@ mod tests {
     #[ignore = "only run to regenerate sample fixtures after changing fixtures/sample1.js"]
     fn generate_sample_fixtures() {
         fn write<T: serde::Serialize>(path: impl AsRef<Path>, value: &T) {
-            serde_any::to_file_pretty(path, value).unwrap();
+            serde_json::to_writer(std::fs::File::create(path).unwrap(), value).unwrap();
         }
 
         let mut tokenizer = Tokenizer::new(Language::Javascript);
