@@ -90,7 +90,6 @@ mod tests {
     use super::*;
     use crate::winnowing::fingerprints::Winnow;
     use crate::winnowing::hashes::{RollingHash, hash_token};
-    use crate::winnowing::read_fixture;
     use crate::winnowing::region::Point;
     use std::path::Path;
 
@@ -140,7 +139,9 @@ mod tests {
 
     #[test]
     fn tokens_match_the_fixture() {
-        let expected: Vec<Token> = read_fixture("fixtures/sample.tokens.json");
+        let expected: Vec<Token> =
+            serde_json::from_str(&std::fs::read_to_string("fixtures/sample.tokens.json").unwrap())
+                .unwrap();
         let mut tokenizer = Tokenizer::new(Language::Javascript);
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
         let actual = tokenizer.parse(&content).tokens(false);
