@@ -13,7 +13,7 @@ impl<T: Clone> PairArray<T> {
     /// Creates a new `PairArray` for `item_count` items, initializing every
     /// pair's value to `default`. For `n` items there are `n * (n - 1) / 2`
     /// unique unordered pairs stored.
-    pub(crate) fn new(item_count: usize, default: T) -> Self {
+    pub fn new(item_count: usize, default: T) -> Self {
         Self { data: vec![default; pair_count(item_count)], item_count }
     }
 }
@@ -36,13 +36,13 @@ impl<T> PairArray<T> {
     }
 
     /// Returns a mutable reference to the value at position (i, j).
-    pub(crate) fn get_mut(&mut self, i: usize, j: usize) -> &mut T {
+    pub fn get_mut(&mut self, i: usize, j: usize) -> &mut T {
         let idx = self.index(i, j);
         &mut self.data[idx]
     }
 
     /// Sets the value at position (i, j).
-    pub(crate) fn set(&mut self, i: usize, j: usize, value: T) {
+    pub fn set(&mut self, i: usize, j: usize, value: T) {
         let idx = self.index(i, j);
         self.data[idx] = value;
     }
@@ -93,7 +93,7 @@ impl<T> PairArray<T> {
 
     /// Returns an iterator over all pairs with their indices, allowing the
     /// values to be modified.
-    pub(crate) fn iter_pairs_mut(&mut self) -> impl Iterator<Item = (usize, usize, &mut T)> {
+    pub fn iter_pairs_mut(&mut self) -> impl Iterator<Item = (usize, usize, &mut T)> {
         pair_indices(self.item_count)
             .zip(self.data.iter_mut())
             .map(|((i, j), value)| (i, j, value))
