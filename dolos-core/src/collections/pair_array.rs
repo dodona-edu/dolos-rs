@@ -1,3 +1,5 @@
+use std::ops::{Index, IndexMut};
+
 use crate::collections::utils::ordered_pair;
 
 /// A symmetric pair array that stores values for pairs (i, j) where i < j.
@@ -37,17 +39,10 @@ impl<T> PairArray<T> {
         self.index(i, j).map(|idx| &self.data[idx])
     }
 
-    /// Returns a mutable reference to the value at position (i, j).
-    /// Panics when (i, j) names no pair.
-    pub fn get_mut(&mut self, i: usize, j: usize) -> &mut T {
-        let idx = self.index(i, j).expect("i and j name a pair");
-        &mut self.data[idx]
-    }
-
-    /// Sets the value at position (i, j).
-    /// Panics when (i, j) names no pair.
-    pub fn set(&mut self, i: usize, j: usize, value: T) {
-        *self.get_mut(i, j) = value;
+    /// Returns a mutable reference to the value at position (i, j), or `None`
+    /// when `i == j` or either index is out of range.
+    pub fn get_mut(&mut self, i: usize, j: usize) -> Option<&mut T> {
+        self.index(i, j).map(|idx| &mut self.data[idx])
     }
 
     /// Returns the number of items being pairwise matched.
@@ -103,6 +98,22 @@ impl<T> PairArray<T> {
     }
 }
 
+/// Returns the value at position (i, j). Panics when (i, j) names no pair.
+impl<T> Index<(usize, usize)> for PairArray<T> {
+    type Output = T;
+
+    fn index(&self, (i, j): (usize, usize)) -> &T {
+        self.get(i, j).expect("i and j name a pair")
+    }
+}
+
+/// Returns the value at position (i, j). Panics when (i, j) names no pair.
+impl<T> IndexMut<(usize, usize)> for PairArray<T> {
+    fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut T {
+        self.get_mut(i, j).expect("i and j name a pair")
+    }
+}
+
 /// The number of unordered pairs among `item_count` items.
 #[inline]
 fn pair_count(item_count: usize) -> usize {
@@ -141,7 +152,7 @@ mod tests {
     #[test]
     fn map_keeps_every_pair_at_its_indices() {
         let mut arr = PairArray::new(3, 0);
-        *arr.get_mut(1, 2) = 5;
+        arr[(1, 2)] = 5;
 
         let mapped = arr.map(|i, j, &value| (i, j, value * 2));
 
@@ -163,8 +174,8 @@ mod tests {
     #[test]
     fn both_index_orders_return_the_same_value() {
         let mut arr = PairArray::new(4, 0);
-        *arr.get_mut(0, 2) = 20;
-        *arr.get_mut(2, 3) = 40;
+        arr[(0, 2)] = 20;
+        arr[(2, 3)] = 40;
 
         assert_eq!(arr.get(0, 2), Some(&20));
         assert_eq!(arr.get(2, 0), Some(&20));
@@ -175,11 +186,12 @@ mod tests {
     #[test]
     fn indices_that_name_no_pair_return_none() {
         let mut arr = PairArray::new(4, 0);
-        *arr.get_mut(1, 3) = 13;
-        *arr.get_mut(2, 3) = 23;
+        arr[(1, 3)] = 13;
+        arr[(2, 3)] = 23;
 
         assert_eq!(arr.get(2, 2), None);
         assert_eq!(arr.get(1, 4), None);
         assert_eq!(arr.get(4, 1), None);
+        assert_eq!(arr.get_mut(2, 2), None);
     }
 }

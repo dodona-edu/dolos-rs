@@ -87,14 +87,13 @@ impl<'a> MatchCollector<'a> {
         if let Some(m) = self.matches.as_mut() {
             let (_, _, left_start, right_start) =
                 ordered_pair_with(seq1, seq2, sp1.start, sp2.start);
-            m.get_mut(seq1, seq2)
-                .push(Match { left_start, right_start, length });
+            m[(seq1, seq2)].push(Match { left_start, right_start, length });
         }
     }
 
     /// Update the longest match of a pair if the new length exceeds the current maximum.
     fn update_longest_match(&mut self, seq1: usize, seq2: usize, length: usize) {
-        let current = self.longest_matches.get_mut(seq1, seq2);
+        let current = &mut self.longest_matches[(seq1, seq2)];
         if length > *current {
             *current = length;
         }
