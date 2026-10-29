@@ -15,9 +15,6 @@ use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 /// A plagiarism analysis over a set of source files.
-///
-/// [`Dolos::new`] reads and fingerprints the files. [`Dolos::build_report`]
-/// compares them pairwise.
 pub struct Dolos {
     metadata: Metadata,
     files: Vec<File>,

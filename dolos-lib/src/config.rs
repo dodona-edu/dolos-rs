@@ -30,8 +30,6 @@ pub enum FragmentSortBy {
 /// Validated configuration for a Dolos analysis run.
 ///
 /// Construct via [`DolosConfig::builder()`] or [`DolosConfig::default()`].
-/// A `DolosConfig` value is always valid — construction fails rather than
-/// producing a config with out-of-range fields.
 ///
 /// # Examples
 ///
@@ -122,9 +120,7 @@ impl Default for DolosConfig {
 
 /// Builder for [`DolosConfig`]. Get one with [`DolosConfig::builder()`].
 ///
-/// All values start at the defaults that the CLI uses. The setters do not
-/// check their value. [`build`](DolosConfigBuilder::build) checks all values
-/// and returns the [`DolosConfig`].
+/// All values start at the defaults that the CLI uses.
 ///
 /// # Examples
 ///
