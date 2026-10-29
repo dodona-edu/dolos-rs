@@ -11,7 +11,6 @@
 //! ```
 //! # #[cfg(feature = "lang-python")] {
 //! use tree_sitter_grammars::Language;
-//!
 //! use std::path::Path;
 //!
 //! assert_eq!(Language::from_path(Path::new("src/main.py")), [Language::Python]);
@@ -209,7 +208,6 @@ impl Language {
     /// ```
     /// # #[cfg(feature = "lang-python")] {
     /// use tree_sitter_grammars::Language;
-    ///
     /// use std::path::Path;
     ///
     /// assert_eq!(Language::from_path(Path::new("main.PY")), [Language::Python]);
@@ -235,7 +233,6 @@ impl Language {
     /// ```
     /// # #[cfg(feature = "lang-javascript")] {
     /// use tree_sitter_grammars::Language;
-    ///
     /// use std::path::Path;
     ///
     /// assert!(Language::Javascript.matches(Path::new("src/app.js")));
