@@ -16,8 +16,8 @@
 //! let options = AnalysisOptions { min_match_length: 2, keep_matches: true };
 //! let result = analyze(&sequences, None, &options)?;
 //!
-//! assert_eq!(result.metrics.get(0, 1).similarity, 0.6);
-//! assert_eq!(result.matches.map(|m| m.get(0, 1).len()), Some(1));
+//! assert_eq!(result.metrics()[(0, 1)].similarity, 0.6);
+//! assert_eq!(result.matches().map(|m| m[(0, 1)].len()), Some(1));
 //! # Ok::<(), std::io::Error>(())
 //! ```
 
