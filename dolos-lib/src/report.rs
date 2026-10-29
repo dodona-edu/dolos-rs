@@ -16,7 +16,7 @@ pub struct Pair {
     pub fragments: Option<Vec<Fragment>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Report {
     pub metadata: Metadata,
     pub files: Vec<Rc<File>>,
