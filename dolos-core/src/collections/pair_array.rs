@@ -2,12 +2,9 @@ use std::ops::{Index, IndexMut};
 
 use crate::collections::utils::ordered_pair;
 
-/// One value for every unordered pair of items.
+/// A symmetric pair array that stores values for pairs (i, j) where i < j.
 ///
-/// `(i, j)` and `(j, i)` name the same pair. An item does not form a pair with
-/// itself. Like the standard collections, [`get`](Self::get) and
-/// [`get_mut`](Self::get_mut) return `None` for indices that name no pair, and
-/// indexing with `[(i, j)]` panics.
+/// `(i, j)` and `(j, i)` name the same pair.
 ///
 /// # Examples
 ///
@@ -18,7 +15,6 @@ use crate::collections::utils::ordered_pair;
 /// similarities[(0, 2)] = 0.5;
 ///
 /// assert_eq!(similarities[(2, 0)], 0.5);
-/// assert_eq!(similarities.get(1, 1), None);
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PairArray<T> {
@@ -258,8 +254,7 @@ impl<T> PairArray<T> {
 /// # Panics
 ///
 /// Panics when `i == j`, or when `i` or `j` is not below
-/// [`item_count`](PairArray::item_count). Use [`PairArray::get`] for `None`
-/// instead.
+/// [`item_count`](PairArray::item_count).
 impl<T> Index<(usize, usize)> for PairArray<T> {
     type Output = T;
 
@@ -273,8 +268,7 @@ impl<T> Index<(usize, usize)> for PairArray<T> {
 /// # Panics
 ///
 /// Panics when `i == j`, or when `i` or `j` is not below
-/// [`item_count`](PairArray::item_count). Use [`PairArray::get_mut`] for `None`
-/// instead.
+/// [`item_count`](PairArray::item_count).
 impl<T> IndexMut<(usize, usize)> for PairArray<T> {
     fn index_mut(&mut self, (i, j): (usize, usize)) -> &mut T {
         self.get_mut(i, j).expect("i and j name a pair")
