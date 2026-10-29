@@ -1,7 +1,7 @@
 use dolos_core::{AnalysisOptions, AnalysisResult, Match, PairMetrics, analyze};
 
 fn matches(result: &AnalysisResult, i: usize, j: usize) -> &[Match] {
-    result.matches.as_ref().unwrap().get(i, j)
+    &result.matches().unwrap()[(i, j)]
 }
 
 // The run `2 3 4` covers 3 of the 5 symbols on each side: 6 of 10.
@@ -19,7 +19,7 @@ fn shared_run_gives_the_metrics_of_the_pair() {
         overlap_right: 3,
         longest_match: 3,
     };
-    assert_eq!(result.metrics.get(0, 1), &expected);
+    assert_eq!(result.metrics()[(0, 1)], expected);
 }
 
 #[test]
@@ -40,7 +40,7 @@ fn iter_pairs_yields_every_pair_once_in_index_order() {
     let result = analyze(&sequences, None, &options).unwrap();
 
     let longest: Vec<(usize, usize, usize)> = result
-        .metrics
+        .metrics()
         .iter_pairs()
         .map(|(i, j, m)| (i, j, m.longest_match))
         .collect();
@@ -63,7 +63,7 @@ fn keep_matches_off_leaves_out_the_matches() {
     let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
     let result = analyze(&sequences, None, &options).unwrap();
 
-    assert!(result.matches.is_none());
+    assert!(result.matches().is_none());
 }
 
 #[test]
@@ -75,8 +75,8 @@ fn keep_matches_does_not_change_the_metrics() {
     let without_matches = analyze(&sequences, None, &without_options).unwrap();
 
     assert_eq!(
-        without_matches.metrics.get(0, 1),
-        with_matches.metrics.get(0, 1)
+        without_matches.metrics()[(0, 1)],
+        with_matches.metrics()[(0, 1)]
     );
 }
 
@@ -86,7 +86,7 @@ fn empty_sequences_have_no_similarity() {
     let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
     let result = analyze(&sequences, None, &options).unwrap();
 
-    assert_eq!(result.metrics.get(0, 1), &PairMetrics::default());
+    assert_eq!(result.metrics()[(0, 1)], PairMetrics::default());
 }
 
 // The ranges cover positions 0, 1 and 2, so 1 of the 4 positions is left.
@@ -97,5 +97,5 @@ fn overlapping_ignored_ranges_count_each_position_once() {
     let options = AnalysisOptions { min_match_length: 1, keep_matches: false };
     let result = analyze(&sequences, Some(&ignored), &options).unwrap();
 
-    assert_eq!(result.metrics.get(0, 1).total_left, 1);
+    assert_eq!(result.metrics()[(0, 1)].total_left, 1);
 }
