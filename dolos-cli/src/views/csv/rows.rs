@@ -23,7 +23,8 @@ impl<'a> MetadataRow<'a> {
 /// The last three are empty unless `--include-analysis-data` was given:
 /// - `fingerprints`: one hash per fingerprint, `[hash,...]`.
 /// - `fingerprintRegions`: `[startRow,startCol,endRow,endCol]` per fingerprint.
-/// - `ignoredIntervals`: one half-open `[start,end)` interval per ignored run.
+/// - `ignoredIntervals`: `[start,end]` per ignored run, a half-open interval of fingerprint
+///   indices.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
     id: usize,
