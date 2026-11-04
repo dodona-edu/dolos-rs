@@ -20,17 +20,17 @@ pub fn serve(report_dir: &Path, server: &Server) -> Result<()> {
     runtime.block_on(async move {
         let listener = tokio::net::TcpListener::bind((server.host.as_str(), server.port)).await?;
         let url = format!("http://{}:{}", server.host, server.port);
-        println!("Dolos is available on {url}");
+        log::info!("Dolos is available on {url}");
 
         if server.open_browser {
-            println!("Opening the web page in your browser...");
+            log::info!("opening the web page in your browser");
             // A browser that does not start is not fatal: the server is already usable.
             if let Err(e) = open::that_detached(&url) {
-                eprintln!("Could not open the browser: {e}");
+                log::warn!("could not open the browser: {e}");
             }
         }
 
-        println!("Press Ctrl-C to exit.");
+        log::info!("press Ctrl-C to exit");
         axum::serve(listener, router).await?;
         Ok(())
     })
