@@ -1,3 +1,4 @@
+mod line_index;
 mod report_dir;
 mod rows;
 mod view;

@@ -1,3 +1,4 @@
+use crate::views::csv::line_index::LineIndex;
 use dolos::{File, Fragment, Pair, Region};
 use serde::Serialize;
 use std::borrow::Cow;
@@ -24,6 +25,9 @@ impl<'a> MetadataRow<'a> {
 /// - `fingerprints`: one hash per fingerprint, `[hash,...]`.
 /// - `fingerprintRegions`: `[startRow,startCol,endRow,endCol]` per fingerprint.
 /// - `ignoredIntervals`: one half-open `[start,end)` interval per ignored run.
+///
+/// A region row is a zero-based line number. A region column is a zero-based offset in its line,
+/// in UTF-16 code units.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
     id: usize,
@@ -44,14 +48,15 @@ impl<'a> FileRow<'a> {
         "ignoredIntervals",
     ];
 
-    pub fn new(file: &'a File) -> Self {
+    pub fn new(file: &'a File, lines: &LineIndex) -> Self {
         let data = file.analysis_data.as_ref();
+        let region = |region: &Region| region_to_string(region, lines);
         Self {
             id: file.id,
             path: file.relative_path.to_string_lossy(),
             content: &file.content,
             fingerprints: data.map(|d| bracketed(&d.fingerprints, usize::to_string)),
-            fingerprint_regions: data.map(|d| bracketed(&d.regions, region_to_string)),
+            fingerprint_regions: data.map(|d| bracketed(&d.regions, region)),
             ignored_intervals: data.map(|d| bracketed(&d.ignored, range_to_string)),
         }
     }
@@ -114,7 +119,8 @@ impl PairRow {
 ///
 /// - `leftFileId`, `rightFileId`: the ids of the two files in `files.csv`.
 /// - `leftRegion`, `rightRegion`: the fragment in each file, as
-///   `[startRow,startCol,endRow,endCol]`.
+///   `[startRow,startCol,endRow,endCol]`. A row is a zero-based line number. A column is a
+///   zero-based offset in its line, in UTF-16 code units.
 /// - `fingerprintCount`: the number of fingerprints in the fragment.
 #[derive(Serialize)]
 pub struct FragmentRow {
@@ -134,12 +140,17 @@ impl FragmentRow {
         "fingerprintCount",
     ];
 
-    pub fn new(pair: &Pair, fragment: &Fragment) -> Self {
+    pub fn new(
+        pair: &Pair,
+        fragment: &Fragment,
+        left_lines: &LineIndex,
+        right_lines: &LineIndex,
+    ) -> Self {
         Self {
             left_file_id: pair.left_file.id,
             right_file_id: pair.right_file.id,
-            left_region: region_to_string(&fragment.left_region),
-            right_region: region_to_string(&fragment.right_region),
+            left_region: region_to_string(&fragment.left_region, left_lines),
+            right_region: region_to_string(&fragment.right_region, right_lines),
             fingerprint_count: fragment.fingerprint_count,
         }
     }
@@ -153,12 +164,13 @@ fn range_to_string(range: &Range<usize>) -> String {
     format!("[{},{}]", range.start, range.end)
 }
 
-fn region_to_string(region: &Region) -> String {
+/// Format `region` as `[startRow,startCol,endRow,endCol]`, with the columns in UTF-16 code units.
+fn region_to_string(region: &Region, lines: &LineIndex) -> String {
     format!(
         "[{},{},{},{}]",
         region.start_point.row,
-        region.start_point.column,
+        lines.utf16_column(region.start_point),
         region.end_point.row,
-        region.end_point.column,
+        lines.utf16_column(region.end_point),
     )
 }

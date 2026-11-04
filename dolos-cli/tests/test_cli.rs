@@ -12,8 +12,13 @@ fn dolos_run(files: &[&str], args: &[&str]) -> Command {
     cmd
 }
 
-/// Run a CSV report into a fresh directory and return that directory.
+/// Run a CSV report of the two fixtures into a fresh directory and return that directory.
 fn csv_report(tmp: &TempDir, extra: &[&str]) -> PathBuf {
+    csv_report_of(tmp, &[SAMPLE1, SAMPLE2], extra)
+}
+
+/// Run a CSV report of `files` into a fresh directory and return that directory.
+fn csv_report_of(tmp: &TempDir, files: &[&str], extra: &[&str]) -> PathBuf {
     let report_dir = tmp.path().join("report");
     #[rustfmt::skip]
     let args = [
@@ -21,10 +26,22 @@ fn csv_report(tmp: &TempDir, extra: &[&str]) -> PathBuf {
         "-n", "report",
         "-o", report_dir.to_str().unwrap(),
     ];
-    dolos_run(&[SAMPLE1, SAMPLE2], &[&args[..], extra].concat())
+    dolos_run(files, &[&args[..], extra].concat())
         .assert()
         .success();
     report_dir
+}
+
+/// Run a CSV report with one fingerprint per token of two copies of a line with non-ASCII text.
+fn non_ascii_report(tmp: &TempDir) -> PathBuf {
+    let line = r#"let s = "é😀"; let t = 1;"#;
+    let paths = ["a.js", "b.js"].map(|name| tmp.path().join(name));
+    for path in &paths {
+        std::fs::write(path, format!("{line}\n")).unwrap();
+    }
+    let files = paths.each_ref().map(|path| path.to_str().unwrap());
+    let args = ["-k", "1", "-w", "1", "--include-analysis-data"];
+    csv_report_of(tmp, &files, &args)
 }
 
 fn assert_csv_header(path: &Path, expected: &[&str]) {
@@ -103,6 +120,40 @@ fn fragments_csv_writes_each_region_as_four_numbers() {
         assert_eq!(region(&row[2]).len(), 4);
         assert_eq!(region(&row[3]).len(), 4);
     }
+}
+
+#[test]
+fn fingerprint_regions_give_columns_in_utf16_code_units() {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = non_ascii_report(&tmp);
+
+    let rows = read_rows(&report_dir.join("files.csv"));
+    // The second `let` starts at byte 18 and at UTF-16 code unit 15.
+    assert!(rows[0][4].contains("[0,15,0,19]"), "{}", &rows[0][4]);
+}
+
+#[test]
+fn fragment_regions_give_columns_in_utf16_code_units() {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = non_ascii_report(&tmp);
+
+    let columns = |region: &str| {
+        let numbers: Vec<usize> = region
+            .trim_matches(['[', ']'])
+            .split(',')
+            .map(|n| n.parse().unwrap())
+            .collect();
+        [numbers[1], numbers[3]]
+    };
+
+    let rows = read_rows(&report_dir.join("fragments.csv"));
+    let max_column = rows
+        .iter()
+        .flat_map(|row| [columns(&row[2]), columns(&row[3])])
+        .flatten()
+        .max();
+    // The line is 25 UTF-16 code units long, and 28 bytes.
+    assert_eq!(max_column, Some(25));
 }
 
 #[test]

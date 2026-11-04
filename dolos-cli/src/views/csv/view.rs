@@ -1,3 +1,4 @@
+use crate::views::csv::line_index::LineIndex;
 use crate::views::csv::report_dir::ReportDirectory;
 use crate::views::csv::rows::{FileRow, FragmentRow, MetadataRow, PairRow};
 use crate::views::view::View;
@@ -28,7 +29,18 @@ impl CsvView {
             .map(|(property, value)| MetadataRow::new(property, value));
         write_table(&dir.file("metadata.csv"), &MetadataRow::HEADER, metadata)?;
 
-        let files = report.files.iter().map(|file| FileRow::new(file));
+        // `report.files` is in the order of the file ids, so `lines[id]` belongs to the file with that id.
+        let lines: Vec<LineIndex> = report
+            .files
+            .iter()
+            .map(|file| LineIndex::new(&file.content))
+            .collect();
+
+        let files = report
+            .files
+            .iter()
+            .zip(&lines)
+            .map(|(file, lines)| FileRow::new(file, lines));
         write_table(&dir.file("files.csv"), &FileRow::HEADER, files)?;
 
         let pairs = report
@@ -40,10 +52,12 @@ impl CsvView {
 
         if report.metadata.include_fragments {
             let fragments = report.pairs.iter().flat_map(|pair| {
+                let left_lines = &lines[pair.left_file.id];
+                let right_lines = &lines[pair.right_file.id];
                 pair.fragments
                     .iter()
                     .flatten()
-                    .map(move |fragment| FragmentRow::new(pair, fragment))
+                    .map(move |fragment| FragmentRow::new(pair, fragment, left_lines, right_lines))
             });
 
             write_table(&dir.file("fragments.csv"), &FragmentRow::HEADER, fragments)?;
