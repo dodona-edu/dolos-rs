@@ -21,7 +21,8 @@ impl<'a> LineIndex<'a> {
 
     /// The column of `point` in UTF-16 code units. `point.column` is a byte offset in its line.
     ///
-    /// Returns `point.column` unchanged for a point outside the content.
+    /// Returns `point.column` unchanged for a point outside the content. Panics on such a point in
+    /// a debug build.
     pub fn utf16_column(&self, point: Point) -> usize {
         // In ASCII content, every byte is one UTF-16 code unit.
         let Some(line_starts) = &self.line_starts else {
@@ -31,8 +32,12 @@ impl<'a> LineIndex<'a> {
             .get(point.row)
             .and_then(|&start| self.content.get(start..start + point.column));
         match prefix {
+            // This encodes the line prefix again for each point: O(points × line length) in total.
             Some(prefix) => prefix.encode_utf16().count(),
-            None => point.column,
+            None => {
+                debug_assert!(false, "point {point:?} is outside the content");
+                point.column
+            }
         }
     }
 }

@@ -66,6 +66,14 @@ fn read_column(path: &Path, name: &str) -> Vec<String> {
         .collect()
 }
 
+/// The numbers in a cell such as `[1,2]` or `[[1,2],[3,4]]`, in order.
+fn numbers(cell: &str) -> Vec<usize> {
+    cell.split(['[', ']', ','])
+        .filter(|number| !number.is_empty())
+        .map(|number| number.parse().unwrap())
+        .collect()
+}
+
 /// The rows of a CSV file, without the header.
 fn read_rows(path: &Path) -> Vec<csv::StringRecord> {
     csv::Reader::from_path(path)
@@ -153,17 +161,12 @@ fn fragments_csv_writes_each_region_as_four_numbers() {
     let tmp = TempDir::new().unwrap();
     let report_dir = csv_report(&tmp, &[]);
 
-    let region = |cell: &str| -> Vec<usize> {
-        let numbers = cell.strip_prefix('[').unwrap().strip_suffix(']').unwrap();
-        numbers.split(',').map(|n| n.parse().unwrap()).collect()
-    };
-
     let rows = read_rows(&report_dir.join("fragments.csv"));
     assert!(!rows.is_empty());
     for row in rows {
         assert_eq!((&row[0], &row[1]), ("0", "1"));
-        assert_eq!(region(&row[2]).len(), 4);
-        assert_eq!(region(&row[3]).len(), 4);
+        assert_eq!(numbers(&row[2]).len(), 4);
+        assert_eq!(numbers(&row[3]).len(), 4);
     }
 }
 
@@ -183,12 +186,8 @@ fn fragment_regions_give_columns_in_utf16_code_units() {
     let report_dir = non_ascii_report(&tmp);
 
     let columns = |region: &str| {
-        let numbers: Vec<usize> = region
-            .trim_matches(['[', ']'])
-            .split(',')
-            .map(|n| n.parse().unwrap())
-            .collect();
-        [numbers[1], numbers[3]]
+        let values = numbers(region);
+        [values[1], values[3]]
     };
 
     let rows = read_rows(&report_dir.join("fragments.csv"));
@@ -221,14 +220,12 @@ fn analysis_data_columns_hold_four_region_numbers_per_fingerprint() {
     // The fingerprint count of each fixture, with the default kgram and window.
     let expected = [(SAMPLE1, 96), (SAMPLE2, 108)];
 
-    let count = |cell: &str| cell.trim_matches(['[', ']']).split(',').count();
-
     let rows = read_rows(&report_dir.join("files.csv"));
     assert_eq!(rows.len(), expected.len());
     for (row, (path, fingerprints)) in rows.iter().zip(expected) {
         assert_eq!(&row[1], path);
-        assert_eq!(count(&row[3]), fingerprints);
-        assert_eq!(count(&row[4]), 4 * fingerprints);
+        assert_eq!(numbers(&row[3]).len(), fingerprints);
+        assert_eq!(numbers(&row[4]).len(), 4 * fingerprints);
         // Nothing is ignored without a template or a frequency cap.
         assert_eq!(&row[5], "[]");
     }

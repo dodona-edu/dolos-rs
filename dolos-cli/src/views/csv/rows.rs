@@ -28,7 +28,7 @@ impl<'a> MetadataRow<'a> {
 ///   indices.
 ///
 /// A region row is a zero-based line number. A region column is a zero-based offset in its line,
-/// in UTF-16 code units.
+/// in UTF-16 code units. The end point is the first position after the region.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
     id: usize,
@@ -123,7 +123,8 @@ impl PairRow {
 /// - `leftFileId`, `rightFileId`: the ids of the two files in `files.csv`.
 /// - `leftRegion`, `rightRegion`: the fragment in each file, as
 ///   `[startRow,startCol,endRow,endCol]`. A row is a zero-based line number. A column is a
-///   zero-based offset in its line, in UTF-16 code units.
+///   zero-based offset in its line, in UTF-16 code units. The end point is the first position
+///   after the region.
 /// - `fingerprintCount`: the number of fingerprints in the fragment.
 #[derive(Serialize)]
 pub struct FragmentRow {

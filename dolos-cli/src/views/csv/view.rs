@@ -30,6 +30,13 @@ impl CsvView {
         write_table(&dir.file("metadata.csv"), &MetadataRow::HEADER, metadata)?;
 
         // `report.files` is in the order of the file ids, so `lines[id]` belongs to the file with that id.
+        debug_assert!(
+            report
+                .files
+                .iter()
+                .enumerate()
+                .all(|(i, file)| file.id == i)
+        );
         let lines: Vec<LineIndex> = report
             .files
             .iter()
