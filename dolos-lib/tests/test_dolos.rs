@@ -174,6 +174,24 @@ fn input_mode_gives_the_same_similarity(#[case] input: &str) {
     );
 }
 
+// Each input holds a copy of `fixtures/reader/info.csv`.
+#[rstest]
+#[case::directory("fixtures/reader")]
+#[case::csv("fixtures/reader/info.csv")]
+#[case::zip("fixtures/reader.zip")]
+#[case::tar_gz("fixtures/reader.tar.gz")]
+fn report_holds_the_bytes_of_the_info_csv(#[case] input: &str) {
+    let report = report(&[input], DolosConfig::default());
+
+    let expected = std::fs::read("fixtures/reader/info.csv").unwrap();
+    assert_eq!(report.info_csv, Some(expected));
+}
+
+#[test]
+fn report_has_no_info_csv_for_separate_files() {
+    assert_eq!(report(SAMPLE12, DolosConfig::default()).info_csv, None);
+}
+
 #[test]
 fn detected_language_skips_other_files() {
     let report = Dolos::new(to_path_buf(MIXED), DolosConfig::default())

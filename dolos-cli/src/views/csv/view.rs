@@ -18,7 +18,8 @@ impl CsvView {
 
     /// Write the report and return the directory it was written to.
     ///
-    /// Writes `metadata.csv`, `files.csv` and `pairs.csv`, and `fragments.csv` (if the report tracks the fragments).
+    /// Writes `metadata.csv`, `files.csv` and `pairs.csv`, `fragments.csv` (if the report tracks the fragments),
+    /// and `info.csv` (if the input has one).
     pub fn write(&self, report: &Report) -> Result<ReportDirectory> {
         let dir = ReportDirectory::create(self.destination.clone(), &report.metadata)?;
 
@@ -43,6 +44,10 @@ impl CsvView {
             });
 
             write_table(&dir.file("fragments.csv"), &FragmentRow::HEADER, fragments)?;
+        }
+
+        if let Some(info_csv) = &report.info_csv {
+            std::fs::write(dir.file("info.csv"), info_csv)?;
         }
 
         Ok(dir)

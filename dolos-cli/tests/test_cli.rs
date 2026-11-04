@@ -136,6 +136,28 @@ fn csv_output_without_destination_creates_a_report_directory() {
 }
 
 #[test]
+fn csv_output_copies_the_info_csv_of_the_input() {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = tmp.path().join("report");
+    let input = "../dolos-lib/fixtures/reader";
+
+    dolos_run(&[input], &["-f", "csv", "-o", report_dir.to_str().unwrap()])
+        .assert()
+        .success();
+
+    let copy = std::fs::read(report_dir.join("info.csv")).unwrap();
+    assert_eq!(copy, std::fs::read(format!("{input}/info.csv")).unwrap());
+}
+
+#[test]
+fn csv_output_has_no_info_csv_without_one_in_the_input() {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = csv_report(&tmp, &[]);
+
+    assert!(!report_dir.join("info.csv").exists());
+}
+
+#[test]
 fn csv_output_rejects_an_existing_directory() {
     let tmp = TempDir::new().unwrap();
     // The destination already exists, so the run must fail.

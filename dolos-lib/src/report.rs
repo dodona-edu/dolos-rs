@@ -32,6 +32,30 @@ pub struct Report {
     /// One pair for every two files, in the order of
     /// [`sort_by`](crate::DolosConfigBuilder::sort_by).
     pub pairs: Vec<Pair>,
+    /// The bytes of the `info.csv` of the input, unchanged.
+    ///
+    /// The input has an `info.csv` when it is a directory or an archive with an
+    /// `info.csv` at the top level, or when it is one CSV file. A CSV file is
+    /// kept whatever its name is. `None` for every other input.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(feature = "lang-javascript")]
+    /// # fn main() -> std::io::Result<()> {
+    /// use dolos::{Dolos, DolosConfig};
+    /// use std::path::Path;
+    ///
+    /// let reader = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/reader");
+    ///
+    /// let report = Dolos::new(vec![reader.clone()], DolosConfig::default())?.build_report();
+    /// assert_eq!(report.info_csv, Some(std::fs::read(reader.join("info.csv"))?));
+    /// # Ok(())
+    /// # }
+    /// # #[cfg(not(feature = "lang-javascript"))]
+    /// # fn main() {}
+    /// ```
+    pub info_csv: Option<Vec<u8>>,
 }
 
 impl Report {
@@ -41,6 +65,7 @@ impl Report {
         fragments: Option<PairArray<Vec<Fragment>>>,
         files: Vec<Rc<File>>,
         metadata: Metadata,
+        info_csv: Option<Vec<u8>>,
     ) -> Report {
         let mut fragments = fragments.map(PairArray::into_iter_pairs);
         let mut pairs: Vec<Pair> = metrics
@@ -60,7 +85,7 @@ impl Report {
 
         sort_pairs(&mut pairs, &metadata.sort_by);
 
-        Report { metadata, files, pairs }
+        Report { metadata, files, pairs, info_csv }
     }
 }
 
@@ -139,7 +164,7 @@ mod tests {
         let files = vec![file(0, "a.js"), file(1, "b.js"), file(2, "c.js")];
         let result = analyze_three();
 
-        let report = Report::new(result.metrics(), None, files.clone(), metadata(None));
+        let report = Report::new(result.metrics(), None, files.clone(), metadata(None), None);
 
         assert_eq!(report.pairs.len(), 3);
         let pair_files: Vec<_> = report
@@ -174,6 +199,7 @@ mod tests {
             None,
             files,
             metadata(Some(PairSortBy::Similarity)),
+            None,
         );
 
         let similarities: Vec<f64> = report.pairs.iter().map(|p| p.metrics.similarity).collect();

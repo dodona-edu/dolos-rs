@@ -5,22 +5,23 @@ use std::path::{Path, PathBuf};
 
 /// Resolve files from a directory. If an `info.csv` is present at the top
 /// level, it is used to determine the file list; otherwise files are collected
-/// recursively.
-pub fn from_directory(dir: &Path) -> Result<(String, Vec<PathBuf>)> {
+/// recursively. Also returns the bytes of the `info.csv`, if there is one.
+pub fn from_directory(dir: &Path) -> Result<(String, Vec<PathBuf>, Option<Vec<u8>>)> {
     let csv_path = dir.join("info.csv");
-    let files = if csv_path.is_file() {
-        filenames_from_csv(&csv_path)?
+    let (files, info_csv) = if csv_path.is_file() {
+        let (files, info_csv) = filenames_from_csv(&csv_path)?;
+        (files, Some(info_csv))
     } else {
-        collect_recursive(dir)?
+        (collect_recursive(dir)?, None)
     };
-    Ok((dir_name(dir)?, files))
+    Ok((dir_name(dir)?, files, info_csv))
 }
 
 /// Resolve files from a CSV file. The name is derived from the CSV's parent
-/// directory.
-pub fn from_csv(csv_path: &Path) -> Result<(String, Vec<PathBuf>)> {
-    let files = filenames_from_csv(csv_path)?;
-    Ok((dir_name(csv_dir(csv_path))?, files))
+/// directory. Also returns the bytes of the CSV file.
+pub fn from_csv(csv_path: &Path) -> Result<(String, Vec<PathBuf>, Vec<u8>)> {
+    let (files, info_csv) = filenames_from_csv(csv_path)?;
+    Ok((dir_name(csv_dir(csv_path))?, files, info_csv))
 }
 
 /// Resolve files from an explicit list of paths. All paths must be existing
@@ -47,10 +48,13 @@ pub fn files_name(paths: &[PathBuf]) -> String {
     }
 }
 
-fn filenames_from_csv(csv_path: &Path) -> Result<Vec<PathBuf>> {
+/// Read the paths in the `filename` column of a CSV file, and the bytes of
+/// the CSV file.
+fn filenames_from_csv(csv_path: &Path) -> Result<(Vec<PathBuf>, Vec<u8>)> {
     let dir = csv_dir(csv_path);
+    let bytes = fs::read(csv_path).map_err(|e| Error::new(ErrorKind::InvalidData, e))?;
     let invalid = |e| Error::new(ErrorKind::InvalidData, e);
-    let mut rdr = Reader::from_path(csv_path).map_err(invalid)?;
+    let mut rdr = Reader::from_reader(bytes.as_slice());
 
     let filename_col = rdr
         .headers()
@@ -59,9 +63,11 @@ fn filenames_from_csv(csv_path: &Path) -> Result<Vec<PathBuf>> {
         .position(|h| h == "filename")
         .ok_or_else(|| Error::new(ErrorKind::InvalidData, "CSV missing 'filename' column"))?;
 
-    rdr.records()
+    let files = rdr
+        .records()
         .map(|r| r.map_err(invalid).map(|r| dir.join(&r[filename_col])))
-        .collect()
+        .collect::<Result<_>>()?;
+    Ok((files, bytes))
 }
 
 fn collect_recursive(dir: &Path) -> Result<Vec<PathBuf>> {
@@ -141,6 +147,12 @@ mod tests {
             .collect();
         names.sort();
         assert_eq!(names, ["a.txt", "b.txt", "c.txt"]);
+    }
+
+    #[test]
+    fn from_csv_reports_a_missing_file_as_invalid_data() {
+        let err = from_csv(Path::new("does_not_exist.csv")).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::InvalidData);
     }
 
     #[test]

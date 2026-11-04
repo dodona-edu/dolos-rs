@@ -17,6 +17,8 @@ pub struct Dataset {
     pub name: String,
     pub file_set: FileSet,
     pub language: Language,
+    /// The bytes of the `info.csv` of the input. `None` when the input has none.
+    pub info_csv: Option<Vec<u8>>,
     _temp_dir: Option<TempDir>,
 }
 
@@ -25,8 +27,9 @@ impl Dataset {
     ///
     /// - **Multiple paths** → treated as individual files.
     /// - **One directory** → files collected recursively; `info.csv` is honored
-    ///   when present at the top level.
-    /// - **One CSV file** → file list read from the `filename` column.
+    ///   and kept when present at the top level.
+    /// - **One CSV file** → file list read from the `filename` column; the CSV
+    ///   file is kept as `info.csv`.
     /// - **One archive** (`.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`, `.tbz`,
     ///   `.tbz2`) → extracted to a temporary directory, then treated as a directory.
     ///
@@ -45,30 +48,49 @@ impl Dataset {
 
     fn from_multi_path(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
         let files = resolve::from_files(paths)?;
-        Self::new(None, FileSet::new(PathBuf::new(), files), None, language)
+        Self::new(
+            None,
+            FileSet::new(PathBuf::new(), files),
+            None,
+            None,
+            language,
+        )
     }
 
     fn from_single_path(path: &Path, language: Option<Language>) -> Result<Self> {
         // directory
         if path.is_dir() {
-            let (name, files) = resolve::from_directory(path)?;
-            return Self::new(Some(name), FileSet::new(path, files), None, language);
+            let (name, files, info_csv) = resolve::from_directory(path)?;
+            return Self::new(
+                Some(name),
+                FileSet::new(path, files),
+                info_csv,
+                None,
+                language,
+            );
         }
 
         // CSV file
         if path.extension().is_some_and(|ext| ext == "csv") {
-            let (name, files) = resolve::from_csv(path)?;
+            let (name, files, info_csv) = resolve::from_csv(path)?;
             let base_dir = path.parent().unwrap_or(Path::new("."));
-            return Self::new(Some(name), FileSet::new(base_dir, files), None, language);
+            return Self::new(
+                Some(name),
+                FileSet::new(base_dir, files),
+                Some(info_csv),
+                None,
+                language,
+            );
         }
 
         // archive
         if let Some(extracted) = archive::try_extract(path)? {
             let dir = extracted.temp_dir.path();
-            let (_, files) = resolve::from_directory(dir)?;
+            let (_, files, info_csv) = resolve::from_directory(dir)?;
             return Self::new(
                 Some(extracted.name),
                 FileSet::new(dir, files),
+                info_csv,
                 Some(extracted.temp_dir),
                 language,
             );
@@ -89,6 +111,7 @@ impl Dataset {
     fn new(
         name: Option<String>,
         mut file_set: FileSet,
+        info_csv: Option<Vec<u8>>,
         temp_dir: Option<TempDir>,
         language: Option<Language>,
     ) -> Result<Self> {
@@ -106,7 +129,7 @@ impl Dataset {
         }
 
         let name = name.unwrap_or_else(|| resolve::files_name(&file_set.relative_paths));
-        Ok(Self { name, file_set, language, _temp_dir: temp_dir })
+        Ok(Self { name, file_set, language, info_csv, _temp_dir: temp_dir })
     }
 }
 

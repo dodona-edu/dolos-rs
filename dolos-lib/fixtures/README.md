@@ -14,18 +14,19 @@
 
 `reader/` contains `sample1.js`, `sample2.js`, and an `info.csv` manifest listing those
 two files. The four archives (`reader.zip`, `reader.tar`, `reader.tar.gz`,
-`reader.tar.bz2`) each contain the same two JS files at the archive root.
+`reader.tar.bz2`) each contain the same three files as `reader/` at the archive root.
 
-When `sample1.js` or `sample2.js` are updated, you need to update `reader/` and regenerate the archives:
+When `sample1.js`, `sample2.js` or `reader/info.csv` are updated, you need to update `reader/` and regenerate the archives:
 
 ```sh
 cd dolos-lib/fixtures
 
 cp sample1.js sample2.js reader/
-zip reader.zip sample1.js sample2.js
-tar -cf reader.tar sample1.js sample2.js
-tar -czf reader.tar.gz sample1.js sample2.js
-tar -cjf reader.tar.bz2 sample1.js sample2.js
+rm reader.zip
+(cd reader && zip ../reader.zip info.csv sample1.js sample2.js)
+tar -cf reader.tar -C reader info.csv sample1.js sample2.js
+tar -czf reader.tar.gz -C reader info.csv sample1.js sample2.js
+tar -cjf reader.tar.bz2 -C reader info.csv sample1.js sample2.js
 ```
 
 ## JSON fixtures

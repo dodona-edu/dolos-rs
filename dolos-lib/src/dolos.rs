@@ -22,6 +22,7 @@ pub struct Dolos {
     template_fingerprints: Vec<Vec<Fingerprint>>,
     locations: Option<Vec<Vec<Region>>>,
     tokenizer: Tokenizer,
+    info_csv: Option<Vec<u8>>,
 }
 
 impl Dolos {
@@ -42,6 +43,8 @@ impl Dolos {
     ///     relative to the directory of the CSV file.
     ///   - **One archive** (`.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`,
     ///     `.tbz`, `.tbz2`): extracted, then read as a directory.
+    ///
+    ///   [`Report::info_csv`] holds a copy of the `info.csv` or the CSV file.
     /// - `config`: the analysis configuration. See [`DolosConfig::builder`].
     ///
     /// # Errors
@@ -121,6 +124,7 @@ impl Dolos {
             template_fingerprints: Vec::new(),
             locations,
             tokenizer,
+            info_csv: dataset.info_csv,
         };
 
         dolos.add_files(dataset.file_set)?;
@@ -270,7 +274,13 @@ impl Dolos {
         }
 
         let files = self.files.into_iter().map(Rc::new).collect();
-        Report::new(result.metrics(), fragments, files, self.metadata)
+        Report::new(
+            result.metrics(),
+            fragments,
+            files,
+            self.metadata,
+            self.info_csv,
+        )
     }
 }
 
