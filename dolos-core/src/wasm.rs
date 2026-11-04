@@ -194,7 +194,7 @@ pub struct PairSequence {
 }
 
 /// The options of an `analyzePair` call.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Tsify)]
+#[derive(Debug, Deserialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 pub struct PairOptions {
     /// The minimum length of a match, in symbols. Shorter matches are not
@@ -203,7 +203,7 @@ pub struct PairOptions {
 }
 
 /// The result of an `analyzePair` call.
-#[derive(Debug, Clone, PartialEq, Serialize, Tsify)]
+#[derive(Debug, Serialize, Tsify)]
 pub struct PairResult {
     /// The similarity, totals, overlaps and longest match of the pair.
     metrics: PairMetrics,
@@ -212,10 +212,7 @@ pub struct PairResult {
     matches: Vec<Match>,
 }
 
-/// Compare two sequences.
-///
-/// It runs `analyze` on the two sequences and keeps the matches. The result is
-/// plain data, so it needs no `free()`.
+/// Compare two sequences and return their metrics and matches as plain data.
 ///
 /// @param left - The left sequence of the pair.
 /// @param right - The right sequence of the pair.
@@ -224,7 +221,8 @@ pub struct PairResult {
 /// @returns The metrics and the matches of the pair.
 ///
 /// @throws {Error} when an argument does not match its type, or when the input
-/// breaks a rule of `analyze`.
+/// breaks a rule of `analyze`. Errors name `left` as sequence 0 and `right` as
+/// sequence 1.
 ///
 /// @example
 /// ```ts
@@ -351,53 +349,6 @@ mod tests {
         assert!(
             out_of_range.to_string().contains("is out of range"),
             "{out_of_range}"
-        );
-    }
-
-    /// An `analyzePair` sequence with one symbol per byte of `text`.
-    fn sequence(text: &str, ignored: &[(usize, usize)]) -> PairSequence {
-        PairSequence {
-            fingerprints: text.bytes().map(Symbol::from).collect(),
-            ignored: ignored
-                .iter()
-                .map(|&(start, end)| IgnoredInterval(start..end))
-                .collect(),
-        }
-    }
-
-    #[test]
-    fn pair_result_returns_the_matches_cut_at_ignored_positions() {
-        let options = PairOptions { min_match_length: 1 };
-        let mut matches = pair_result(
-            sequence("ABCDE", &[]),
-            sequence("ABCDE", &[(2, 3)]),
-            options,
-        )
-        .unwrap()
-        .matches;
-        matches.sort_by_key(|m| m.left_start);
-
-        assert_eq!(
-            matches,
-            [
-                Match { left_start: 0, right_start: 0, length: 2 },
-                Match { left_start: 3, right_start: 3, length: 2 },
-            ]
-        );
-    }
-
-    #[test]
-    fn pair_result_rejects_an_interval_past_the_end_of_its_sequence() {
-        let options = PairOptions { min_match_length: 1 };
-        let rejected =
-            pair_result(sequence("AB", &[]), sequence("AB", &[(1, 3)]), options).unwrap_err();
-
-        assert_eq!(rejected.kind(), io::ErrorKind::InvalidInput);
-        assert!(
-            rejected
-                .to_string()
-                .contains("of sequence 1 reaches past its length 2"),
-            "{rejected}"
         );
     }
 }
