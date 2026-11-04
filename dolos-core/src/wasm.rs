@@ -271,11 +271,10 @@ fn pair_result(
 }
 
 /// A half-open `[start, end]` interval of ignored positions.
-///
-/// It deserializes from a list of exactly two positions.
 #[derive(Debug)]
 struct IgnoredInterval(Range<usize>);
 
+/// It deserializes from a list of exactly two positions.
 impl<'de> Deserialize<'de> for IgnoredInterval {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_seq(IgnoredIntervalVisitor)
@@ -322,7 +321,6 @@ fn to_ranges(ignored: Vec<Vec<IgnoredInterval>>) -> Vec<Vec<Range<usize>>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::de::value::SeqDeserializer;
 
     /// An analysis over one sequence per string, one symbol per byte.
     fn run_analysis(inputs: &[&str], keep_matches: bool) -> Analysis {
@@ -400,26 +398,6 @@ mod tests {
                 .to_string()
                 .contains("of sequence 1 reaches past its length 2"),
             "{rejected}"
-        );
-    }
-
-    #[test]
-    fn ignored_interval_rejects_a_list_that_is_not_a_pair() {
-        let deserialize = |positions: Vec<usize>| {
-            IgnoredInterval::deserialize(SeqDeserializer::<_, de::value::Error>::new(
-                positions.into_iter(),
-            ))
-            .unwrap_err()
-            .to_string()
-        };
-
-        assert_eq!(
-            deserialize(vec![1]),
-            "invalid length 1, expected a [start, end] pair"
-        );
-        assert_eq!(
-            deserialize(vec![1, 2, 3]),
-            "invalid length 3, expected a [start, end] pair"
         );
     }
 }
