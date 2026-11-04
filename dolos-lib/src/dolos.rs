@@ -270,7 +270,7 @@ fn read_file(base_dir: &Path, relative: &Path) -> Result<String> {
     std::fs::read_to_string(&path).map_err(|e| {
         Error::new(
             e.kind(),
-            format!("Could not read '{}': {e}", path.display()),
+            format!("could not read '{}': {e}", path.display()),
         )
     })
 }

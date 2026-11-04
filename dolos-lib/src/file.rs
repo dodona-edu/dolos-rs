@@ -8,6 +8,11 @@ use std::ops::Range;
 use std::path::PathBuf;
 use tree_sitter_grammars::Language;
 
+/// The lowercase name of `language` for messages, such as `javascript`.
+pub(crate) fn language_name(language: Language) -> String {
+    format!("{language:?}").to_lowercase()
+}
+
 /// One input file of an analysis.
 #[derive(Clone)]
 pub struct File {
@@ -118,7 +123,7 @@ impl FileSet {
         let Some(&max) = counts.values().max() else {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                "Could not detect the language: no file has a known extension. Specify the language explicitly.",
+                "could not detect the language: no file has a known extension; specify the language",
             ));
         };
 
@@ -130,12 +135,16 @@ impl FileSet {
         winners.sort();
         match winners[..] {
             [language] => Ok(language),
-            _ => Err(Error::new(
-                ErrorKind::InvalidInput,
-                format!(
-                    "Could not detect the language: {winners:?} each match {max} files. Specify the language explicitly."
-                ),
-            )),
+            _ => {
+                let names: Vec<String> = winners.into_iter().map(language_name).collect();
+                Err(Error::new(
+                    ErrorKind::InvalidInput,
+                    format!(
+                        "could not detect the language: {} each match {max} files; specify the language",
+                        names.join(" and ")
+                    ),
+                ))
+            }
         }
     }
 
@@ -170,7 +179,7 @@ mod tests {
         let err = file_set(&["a.h", "b.h", "c.h", "README.md"])
             .detect_language()
             .unwrap_err();
-        assert!(err.to_string().contains("[C, Cpp]"), "{err}");
+        assert!(err.to_string().contains("c and cpp each match"), "{err}");
     }
 
     #[test]

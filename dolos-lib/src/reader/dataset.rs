@@ -1,4 +1,4 @@
-use crate::file::FileSet;
+use crate::file::{FileSet, language_name};
 use std::io::{Error, ErrorKind, Result};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -43,7 +43,10 @@ impl Dataset {
         if file_set.relative_paths.len() < 2 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("Need at least 2 {language:?} files to compare."),
+                format!(
+                    "need at least 2 {} files to compare",
+                    language_name(language)
+                ),
             ));
         }
 

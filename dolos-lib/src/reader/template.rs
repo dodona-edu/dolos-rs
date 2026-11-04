@@ -1,4 +1,4 @@
-use crate::file::FileSet;
+use crate::file::{FileSet, language_name};
 use std::io::{Error, ErrorKind, Result};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -28,13 +28,13 @@ impl Template {
         }
 
         let Input { mut file_set, temp_dir, .. } = Input::read(paths)
-            .map_err(|e| Error::new(e.kind(), format!("Could not read the template: {e}")))?;
+            .map_err(|e| Error::new(e.kind(), format!("could not read the template: {e}")))?;
 
         file_set.retain_language(language);
         if file_set.relative_paths.is_empty() {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("The template has no {language:?} files."),
+                format!("the template has no {} files", language_name(language)),
             ));
         }
 
