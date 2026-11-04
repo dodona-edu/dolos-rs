@@ -167,6 +167,7 @@ fn pairs_are_sorted_in_descending_order(#[case] sort_by: PairSortBy) {
 #[case::tar("fixtures/reader.tar")]
 #[case::tar_gz("fixtures/reader.tar.gz")]
 #[case::tar_bz2("fixtures/reader.tar.bz2")]
+#[case::zip_without_info_csv("fixtures/reader_without_info.zip")]
 fn input_mode_gives_the_same_similarity(#[case] input: &str) {
     assert_eq!(
         pair_sim(&[input], DolosConfig::default()),
@@ -187,9 +188,11 @@ fn report_holds_the_bytes_of_the_info_csv(#[case] input: &str) {
     assert_eq!(report.info_csv, Some(expected));
 }
 
-#[test]
-fn report_has_no_info_csv_for_separate_files() {
-    assert_eq!(report(SAMPLE12, DolosConfig::default()).info_csv, None);
+#[rstest]
+#[case::separate_files(SAMPLE12)]
+#[case::zip_without_info_csv(&["fixtures/reader_without_info.zip"])]
+fn report_has_no_info_csv_without_one_in_the_input(#[case] input: &[&str]) {
+    assert_eq!(report(input, DolosConfig::default()).info_csv, None);
 }
 
 #[test]

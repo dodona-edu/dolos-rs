@@ -15,6 +15,7 @@
 `reader/` contains `sample1.js`, `sample2.js`, and an `info.csv` manifest listing those
 two files. The four archives (`reader.zip`, `reader.tar`, `reader.tar.gz`,
 `reader.tar.bz2`) each contain the same three files as `reader/` at the archive root.
+`reader_without_info.zip` contains only `sample1.js` and `sample2.js`, for an archive without an `info.csv`.
 
 When `sample1.js`, `sample2.js` or `reader/info.csv` are updated, you need to update `reader/` and regenerate the archives:
 
@@ -22,8 +23,9 @@ When `sample1.js`, `sample2.js` or `reader/info.csv` are updated, you need to up
 cd dolos-lib/fixtures
 
 cp sample1.js sample2.js reader/
-rm reader.zip
+rm reader.zip reader_without_info.zip
 (cd reader && zip ../reader.zip info.csv sample1.js sample2.js)
+(cd reader && zip ../reader_without_info.zip sample1.js sample2.js)
 tar -cf reader.tar -C reader info.csv sample1.js sample2.js
 tar -czf reader.tar.gz -C reader info.csv sample1.js sample2.js
 tar -cjf reader.tar.bz2 -C reader info.csv sample1.js sample2.js
