@@ -144,9 +144,13 @@ impl FileSet {
         }
     }
 
-    /// Keep only the files whose extension belongs to `language`.
-    pub fn retain_language(&mut self, language: Language) {
-        self.relative_paths.retain(|path| language.matches(path));
+    /// Keep only the files whose extension belongs to `language`, and return the other files.
+    pub fn retain_language(&mut self, language: Language) -> Vec<PathBuf> {
+        let (kept, skipped) = std::mem::take(&mut self.relative_paths)
+            .into_iter()
+            .partition(|path| language.matches(path));
+        self.relative_paths = kept;
+        skipped
     }
 }
 
@@ -192,10 +196,18 @@ mod tests {
     #[test]
     fn retain_language_keeps_matching_files() {
         let mut files = file_set(&["a.cpp", "README.md", "b.h", ".gitignore", "Makefile"]);
-        files.retain_language(Language::Cpp);
+        let skipped = files.retain_language(Language::Cpp);
         assert_eq!(
             files.relative_paths,
             [PathBuf::from("a.cpp"), PathBuf::from("b.h")]
+        );
+        assert_eq!(
+            skipped,
+            [
+                PathBuf::from("README.md"),
+                PathBuf::from(".gitignore"),
+                PathBuf::from("Makefile")
+            ]
         );
     }
 }

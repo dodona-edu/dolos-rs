@@ -21,6 +21,7 @@ impl CsvView {
     /// Writes `metadata.csv`, `files.csv` and `pairs.csv`, and `fragments.csv` (if the report tracks the fragments).
     pub fn write(&self, report: &Report) -> Result<ReportDirectory> {
         let dir = ReportDirectory::create(self.destination.clone(), &report.metadata)?;
+        log::info!(step = "write"; "writing the report to '{}'", dir.path().display());
 
         let properties = report.metadata.properties();
         let metadata = properties

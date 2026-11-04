@@ -31,7 +31,8 @@ impl Dolos {
     /// Only the files of the configured language are analyzed. Without a
     /// configured language, the language that most file extensions belong to is
     /// used. Plain text ([`Language::Char`]) is used only when no file belongs
-    /// to another language.
+    /// to another language. An input file that cannot be read as UTF-8 text is
+    /// skipped, with a warning through the [`log`] crate.
     ///
     /// # Parameters
     ///
@@ -69,20 +70,16 @@ impl Dolos {
     /// - [`InvalidInput`] when no language is configured and none can be
     ///   detected: no file has a known extension, or several languages share
     ///   the highest file count.
-    /// - [`InvalidInput`] when fewer than 2 files of the language remain. This
-    ///   includes one regular file as input.
+    /// - [`InvalidInput`] when fewer than 2 readable files of the language
+    ///   remain. This includes one regular file as input.
     ///
     /// Reading the [`template`](crate::DolosConfigBuilder::template):
     ///
     /// - The errors of reading the input. An empty list gives no error: the
     ///   analysis then has no template.
     /// - [`InvalidInput`] when no template file of the language remains.
-    ///
-    /// Reading the files:
-    ///
-    /// - The error of the read when an input or template file cannot be read,
-    ///   for example [`NotFound`] for a file in the `filename` column of a CSV
-    ///   file that does not exist.
+    /// - The error of the read when a template file cannot be read, for
+    ///   example [`InvalidData`] for a file that is not valid UTF-8.
     ///
     /// [`InvalidData`]: std::io::ErrorKind::InvalidData
     /// [`InvalidInput`]: std::io::ErrorKind::InvalidInput
@@ -109,6 +106,12 @@ impl Dolos {
     /// ```
     pub fn new(files: Vec<PathBuf>, config: DolosConfig) -> Result<Self> {
         let dataset = Dataset::create(files, config.language)?;
+        if config.max_fingerprint_percentage.is_some() && dataset.files.len() < 3 {
+            log::warn!(
+                "the maximum fingerprint percentage has no use with fewer than 3 files; \
+                 it ignores every shared fingerprint or none"
+            );
+        }
         let metadata = Metadata::from_config(&config, &dataset);
         let template = Template::create(config.template, metadata.language)?;
 
@@ -126,9 +129,24 @@ impl Dolos {
             tokenizer,
         };
 
-        dolos.add_files(&dataset.file_set)?;
+        log::info!(
+            step = "fingerprint";
+            "fingerprinting {} {} files",
+            dataset.files.len(),
+            dataset.language.name()
+        );
+        for file in dataset.files {
+            dolos.add_file(file);
+        }
 
-        dolos.add_template(&template.file_set)?;
+        if !template.file_set.relative_paths.is_empty() {
+            log::info!(
+                step = "template";
+                "fingerprinting the template ({} files)",
+                template.file_set.relative_paths.len()
+            );
+            dolos.add_template(&template.file_set)?;
+        }
 
         Ok(dolos)
     }
@@ -148,27 +166,18 @@ impl Dolos {
         )
     }
 
-    /// Tokenize the files of `file_set` and register them as the files of the analysis.
+    /// Tokenize a read input file and register it as a file of the analysis.
     ///
-    /// The paths and contents are added to `self.files`, the fingerprints to
-    /// `self.fingerprints`, and the locations to `self.locations` when they are kept.
-    fn add_files(&mut self, file_set: &FileSet) -> Result<()> {
-        for relative in &file_set.relative_paths {
-            let content = read_file(&file_set.base_dir, relative)?;
-            let (fingerprints, locations) = self.fingerprint(&content, self.locations.is_some());
+    /// The file is added to `self.files`, the fingerprints to `self.fingerprints`,
+    /// and the locations to `self.locations` when they are kept.
+    fn add_file(&mut self, file: File) {
+        let (fingerprints, locations) = self.fingerprint(&file.content, self.locations.is_some());
 
-            self.fingerprints.push(fingerprints);
-            if let Some(locs) = self.locations.as_mut() {
-                locs.push(locations.expect("locations should be present when they are kept"));
-            }
-            self.files.push(File {
-                id: self.files.len(),
-                relative_path: relative.clone(),
-                content,
-                analysis_data: None,
-            });
+        self.fingerprints.push(fingerprints);
+        if let Some(locs) = self.locations.as_mut() {
+            locs.push(locations.expect("locations should be present when they are kept"));
         }
-        Ok(())
+        self.files.push(file);
     }
 
     /// Tokenize the template files and append their fingerprints to
@@ -233,6 +242,11 @@ impl Dolos {
     /// # fn main() {}
     /// ```
     pub fn build_report(mut self) -> Report {
+        let file_count = self.files.len();
+        match file_count * (file_count - 1) / 2 {
+            1 => log::info!(step = "compare"; "comparing 1 pair"),
+            pairs => log::info!(step = "compare"; "comparing {pairs} pairs"),
+        }
         let ignored = ignore::classify(
             &self.fingerprints,
             &self.template_fingerprints,

@@ -23,6 +23,9 @@ tokio = { version = "1.53.1", features = ["rt", "net"] }
 tower-http = { version = "0.7.1", features = ["fs"] }
 open = "5.4.3"
 anyhow = "1.0.104"
+env_logger = { version = "0.11.11", default-features = false, features = ["auto-color"] }
+clap-verbosity-flag = "3.0.4"
+log = { version = "0.4.35", features = ["kv"] }
 
 [dev-dependencies]
 assert_cmd = "2.2.2"
