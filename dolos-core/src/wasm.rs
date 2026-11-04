@@ -1,10 +1,12 @@
-//! The JavaScript binding for [`crate::analyze`].
+//! The JavaScript binding for [`crate::analyze`]: `analyze` for many
+//! sequences, `analyzePair` for exactly two.
 //!
 //! `#[wasm_bindgen]` exports only the `pub` methods of [`Analysis`], so the
 //! private ones stay callable from the native tests.
 
-use crate::{AnalysisOptions, AnalysisResult, PairMetrics, Symbol};
-use serde::de::{self, Deserialize, Deserializer, SeqAccess, Visitor};
+use crate::{AnalysisOptions, AnalysisResult, Match, PairMetrics, Symbol};
+use serde::de::{self, SeqAccess, Visitor};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt;
 use std::io;
 use std::ops::Range;
@@ -178,6 +180,96 @@ pub fn analyze(
     )?))
 }
 
+/// One sequence of an `analyzePair` call.
+#[derive(Debug, Deserialize, Tsify)]
+pub struct PairSequence {
+    /// The symbols of the sequence. Every symbol is a non-negative integer
+    /// below 4294967295.
+    #[tsify(type = "number[]")]
+    fingerprints: Vec<Symbol>,
+    /// The half-open `[start, end]` intervals of positions to leave out. Pass
+    /// `[]` to ignore nothing.
+    #[tsify(type = "[number, number][]")]
+    ignored: Vec<IgnoredInterval>,
+}
+
+/// The options of an `analyzePair` call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub struct PairOptions {
+    /// The minimum length of a match, in symbols. Shorter matches are not
+    /// recorded and do not count in the metrics. At least 1.
+    min_match_length: usize,
+}
+
+/// The result of an `analyzePair` call.
+#[derive(Debug, Clone, PartialEq, Serialize, Tsify)]
+pub struct PairResult {
+    /// The similarity, totals, overlaps and longest match of the pair.
+    metrics: PairMetrics,
+    /// The matches of the pair, in no specific order. Empty when the pair has
+    /// none.
+    matches: Vec<Match>,
+}
+
+/// Compare two sequences.
+///
+/// It runs `analyze` on the two sequences and keeps the matches. The result is
+/// plain data, so it needs no `free()`.
+///
+/// @param left - The left sequence of the pair.
+/// @param right - The right sequence of the pair.
+/// @param options - The minimum match length.
+///
+/// @returns The metrics and the matches of the pair.
+///
+/// @throws {Error} when an argument does not match its type, or when the input
+/// breaks a rule of `analyze`.
+///
+/// @example
+/// ```ts
+/// const { metrics, matches } = analyzePair(
+///   { fingerprints: [1, 2, 3, 4], ignored: [] },
+///   { fingerprints: [9, 2, 3, 4], ignored: [[3, 4]] },
+///   { minMatchLength: 2 },
+/// );
+///
+/// console.log(metrics.longestMatch); // 2
+/// console.log(matches); // [{ leftStart: 1, rightStart: 1, length: 2 }]
+/// ```
+#[wasm_bindgen(js_name = analyzePair)]
+pub fn analyze_pair(
+    left: Ts<PairSequence>,
+    right: Ts<PairSequence>,
+    options: Ts<PairOptions>,
+) -> Result<Ts<PairResult>, JsError> {
+    let result = pair_result(left.to_rust()?, right.to_rust()?, options.to_rust()?)?;
+
+    Ok(result.into_ts()?)
+}
+
+/// The metrics and matches of the pair `(left, right)`.
+fn pair_result(
+    left: PairSequence,
+    right: PairSequence,
+    options: PairOptions,
+) -> io::Result<PairResult> {
+    let sequences = [left.fingerprints, right.fingerprints];
+    let ignored = to_ranges(vec![left.ignored, right.ignored]);
+    let options = AnalysisOptions {
+        min_match_length: options.min_match_length,
+        keep_matches: true,
+    };
+
+    let result = crate::analyze(&sequences, Some(&ignored), &options)?;
+    let matches = result
+        .matches()
+        .map(|matches| matches[(0, 1)].clone())
+        .unwrap_or_default();
+
+    Ok(PairResult { metrics: result.metrics()[(0, 1)].clone(), matches })
+}
+
 /// A half-open `[start, end]` interval of ignored positions.
 ///
 /// It deserializes from a list of exactly two positions.
@@ -261,6 +353,53 @@ mod tests {
         assert!(
             out_of_range.to_string().contains("is out of range"),
             "{out_of_range}"
+        );
+    }
+
+    /// An `analyzePair` sequence with one symbol per byte of `text`.
+    fn sequence(text: &str, ignored: &[(usize, usize)]) -> PairSequence {
+        PairSequence {
+            fingerprints: text.bytes().map(Symbol::from).collect(),
+            ignored: ignored
+                .iter()
+                .map(|&(start, end)| IgnoredInterval(start..end))
+                .collect(),
+        }
+    }
+
+    #[test]
+    fn pair_result_returns_the_matches_cut_at_ignored_positions() {
+        let options = PairOptions { min_match_length: 1 };
+        let mut matches = pair_result(
+            sequence("ABCDE", &[]),
+            sequence("ABCDE", &[(2, 3)]),
+            options,
+        )
+        .unwrap()
+        .matches;
+        matches.sort_by_key(|m| m.left_start);
+
+        assert_eq!(
+            matches,
+            [
+                Match { left_start: 0, right_start: 0, length: 2 },
+                Match { left_start: 3, right_start: 3, length: 2 },
+            ]
+        );
+    }
+
+    #[test]
+    fn pair_result_rejects_an_interval_past_the_end_of_its_sequence() {
+        let options = PairOptions { min_match_length: 1 };
+        let rejected =
+            pair_result(sequence("AB", &[]), sequence("AB", &[(1, 3)]), options).unwrap_err();
+
+        assert_eq!(rejected.kind(), io::ErrorKind::InvalidInput);
+        assert!(
+            rejected
+                .to_string()
+                .contains("of sequence 1 reaches past its length 2"),
+            "{rejected}"
         );
     }
 

@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {analyze, type PairMetrics,} from "../pkg-node/dolos_core.js";
+import {analyze, analyzePair, type PairMetrics,} from "../pkg-node/dolos_core.js";
 
 // One symbol per code unit of `text`.
 const symbols = (text: string): number[] => [...text].map((c) => c.charCodeAt(0));
@@ -82,4 +82,36 @@ test("an interval that is not a pair of positions throws a catchable Error", () 
   throwsFor([1, 2, 3], /invalid length 3, expected a \[start, end\] pair/);
   throwsFor([-1, 2], /expected usize/);
   throwsFor({ start: 0, end: 1 }, /expected a \[start, end\] pair/);
+});
+
+test("analyzePair returns the metrics and matches of the pair as plain data", () => {
+  const result = analyzePair(
+    { fingerprints: symbols("ABCDE"), ignored: [] },
+    { fingerprints: symbols("ABCDE"), ignored: [[2, 3]] },
+    { minMatchLength: 1 },
+  );
+  result.matches.sort((a, b) => a.leftStart - b.leftStart);
+
+  assert.deepEqual(result, {
+    metrics: {
+      similarity: 8 / 9,
+      totalLeft: 5,
+      totalRight: 4,
+      overlapLeft: 4,
+      overlapRight: 4,
+      longestMatch: 2,
+    },
+    matches: [
+      { leftStart: 0, rightStart: 0, length: 2 },
+      { leftStart: 3, rightStart: 3, length: 2 },
+    ],
+  });
+});
+
+test("analyzePair rejects unusable input with a catchable Error", () => {
+  const ab = { fingerprints: symbols("AB"), ignored: [] };
+
+  assert.throws(() => analyzePair(ab, ab, {minMatchLength: 0}), /minimum match length/);
+  assert.throws(() => analyzePair(ab, { fingerprints: symbols("AB"), ignored: [[1, 3]] }, {minMatchLength: 1}), /reaches past its length/);
+  assert.throws(() => analyzePair(ab, { fingerprints: symbols("AB") } as typeof ab, {minMatchLength: 1}), /missing field `ignored`/);
 });
