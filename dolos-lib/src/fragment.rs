@@ -1,5 +1,5 @@
 use crate::config::FragmentSortBy;
-use crate::winnowing::region::Region;
+use crate::winnowing::region::{Point, Region};
 use dolos_core::{Match, PairArray};
 use std::cmp::Reverse;
 
@@ -55,30 +55,33 @@ pub fn resolve_fragments(
 
 /// Sort fragments in-place according to `sort_by`.
 ///
-/// `FileOrder` and `None` both sort by left-file source position (row, column).
+/// `FileOrder` and `None` both sort by the position. The other orders break
+/// ties on the position.
 fn sort_fragments(fragments: &mut [Fragment], sort_by: &Option<FragmentSortBy>) {
     match sort_by {
         Some(FragmentSortBy::KgramsAscending) => {
-            fragments.sort_by_key(|f| f.fingerprint_count);
+            fragments.sort_by_key(|f| (f.fingerprint_count, position(f)));
         }
         Some(FragmentSortBy::KgramsDescending) => {
-            fragments.sort_by_key(|f| Reverse(f.fingerprint_count));
+            fragments.sort_by_key(|f| (Reverse(f.fingerprint_count), position(f)));
         }
         Some(FragmentSortBy::FileOrder) | None => {
-            fragments.sort_by_key(|f| {
-                (
-                    f.left_region.start_point.row,
-                    f.left_region.start_point.column,
-                )
-            });
+            fragments.sort_by_key(position);
         }
     }
+}
+
+/// The start of the fragment in the left file, then in the right file.
+fn position(fragment: &Fragment) -> (Point, Point) {
+    (
+        fragment.left_region.start_point,
+        fragment.right_region.start_point,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::winnowing::region::Point;
     use dolos_core::{AnalysisOptions, AnalysisResult};
     use rstest::rstest;
 
@@ -150,10 +153,8 @@ mod tests {
     ) {
         // One match of length 2 at the start, one of length 1 at the end.
         let result = analyze_pair(vec![2, 3, 9, 1], vec![2, 3, 8, 1]);
-        let mut matches = result.matches().unwrap().get(0, 1).unwrap().clone();
-        matches.sort_by_key(|m| m.left_start);
         assert_eq!(
-            matches,
+            result.matches().unwrap()[(0, 1)],
             vec![
                 Match { left_start: 0, right_start: 0, length: 2 },
                 Match { left_start: 3, right_start: 3, length: 1 },
@@ -169,5 +170,30 @@ mod tests {
             .collect();
 
         assert_eq!(counts, expected);
+    }
+
+    /// A fragment of one fingerprint on row `left_row` of the left file and
+    /// row `right_row` of the right file.
+    fn fragment(left_row: usize, right_row: usize) -> Fragment {
+        Fragment {
+            left_region: Region::new(Point::new(left_row, 0), Point::new(left_row, 5)),
+            right_region: Region::new(Point::new(right_row, 0), Point::new(right_row, 5)),
+            fingerprint_count: 1,
+        }
+    }
+
+    // All fragments have the same length and two have the same left start, so
+    // only the position decides their order.
+    #[rstest]
+    #[case::kgrams_ascending(Some(FragmentSortBy::KgramsAscending))]
+    #[case::kgrams_descending(Some(FragmentSortBy::KgramsDescending))]
+    #[case::file_order(Some(FragmentSortBy::FileOrder))]
+    #[case::default(None)]
+    fn sort_fragments_breaks_ties_on_the_position(#[case] sort_by: Option<FragmentSortBy>) {
+        let mut fragments = vec![fragment(3, 10), fragment(3, 2), fragment(1, 5)];
+
+        sort_fragments(&mut fragments, &sort_by);
+
+        assert_eq!(fragments, [fragment(1, 5), fragment(3, 2), fragment(3, 10)]);
     }
 }

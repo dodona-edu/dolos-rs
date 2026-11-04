@@ -15,13 +15,15 @@ pub enum PairSortBy {
 }
 
 /// The order of the fragments of a [`Pair`](crate::Pair).
+///
+/// Fragments with the same number of fingerprints come in file order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FragmentSortBy {
     /// From the fewest to the most fingerprints.
     KgramsAscending,
     /// From the most to the fewest fingerprints.
     KgramsDescending,
-    /// By the start of the fragment in the left file.
+    /// By the start of the fragment in the left file, then in the right file.
     FileOrder,
 }
 
