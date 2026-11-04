@@ -46,16 +46,32 @@ dolos run --output-format csv --output-destination ./results/ path/to/files/
 The binding is behind the opt-in `wasm` feature, so a normal build pulls none of
 its dependencies.
 
+The package is published to npm as
+[`@dodona/dolos-core`](https://www.npmjs.com/package/@dodona/dolos-core), from
+version 2.0.0. Versions 1.x are the earlier TypeScript core.
+
 ```sh
-rustup target add wasm32-unknown-unknown
-wasm-pack build dolos-core --target bundler --release -- --features wasm
+npm install @dodona/dolos-core
 ```
 
-This writes the npm package `dolos-core` to `dolos-core/pkg/`, which git
-ignores. The package version follows the crate version.
+To build the package yourself:
+
+```sh
+rustup target add wasm32-unknown-unknown
+wasm-pack build dolos-core --target web --scope dodona --release -- --features wasm
+```
+
+This writes the npm package `@dodona/dolos-core` to `dolos-core/pkg/`, which
+git ignores. A local build takes the version of the crate. The publish
+workflow sets the npm version.
+
+The package loads its `.wasm` file in `init()`. Call it once, and await it
+before the first call into the package:
 
 ```ts
-import { analyze } from "dolos-core";
+import init, { analyze } from "@dodona/dolos-core";
+
+await init();
 
 // `ignored` holds the positions to leave out, one list of half-open
 // `[start, end]` intervals per sequence, the same shape as the ignored
@@ -74,7 +90,9 @@ For exactly two sequences, `analyzePair` returns the metrics and the matches as
 plain data, so there is nothing to release:
 
 ```ts
-import { analyzePair } from "dolos-core";
+import init, { analyzePair } from "@dodona/dolos-core";
+
+await init();
 
 const { metrics, matches } = analyzePair(
   { fingerprints: leftFingerprints, ignored: leftIgnored },
@@ -83,9 +101,8 @@ const { metrics, matches } = analyzePair(
 );
 ```
 
-Vite 8.1 and later need no plugin. Earlier versions need
-[`vite-plugin-wasm`](https://www.npmjs.com/package/vite-plugin-wasm) and
-`build.target: "esnext"`.
+The package works with any bundler and without one. Vite needs no plugin and no
+config change, also in a worker.
 
 ## Who made this?
 

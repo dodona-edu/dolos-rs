@@ -27,6 +27,7 @@ impl Analysis {
     ///
     /// @example
     /// ```ts
+    /// await init();
     /// using analysis = analyze([[1, 2], [1, 2], [3]], null, { minMatchLength: 1, keepMatches: false });
     /// console.log(analysis.sequenceCount); // 3
     /// ```
@@ -39,6 +40,7 @@ impl Analysis {
     ///
     /// @example
     /// ```ts
+    /// await init();
     /// using analysis = analyze([[1, 2], [1, 2], [3]], null, { minMatchLength: 1, keepMatches: false });
     /// console.log(analysis.pairCount); // 3
     /// ```
@@ -51,6 +53,7 @@ impl Analysis {
     ///
     /// @example
     /// ```ts
+    /// await init();
     /// using analysis = analyze([[1, 2], [1, 2]], null, { minMatchLength: 1, keepMatches: true });
     /// console.log(analysis.hasMatches); // true
     /// ```
@@ -72,6 +75,7 @@ impl Analysis {
     ///
     /// @example
     /// ```ts
+    /// await init();
     /// using analysis = analyze([[1, 2, 3], [1, 2, 4]], null, { minMatchLength: 1, keepMatches: false });
     /// console.log(analysis.metrics(0, 1).longestMatch); // 2
     /// ```
@@ -94,6 +98,7 @@ impl Analysis {
     ///
     /// @example
     /// ```ts
+    /// await init();
     /// using analysis = analyze([[1, 2, 3], [9, 1, 2]], null, { minMatchLength: 1, keepMatches: true });
     /// console.log(analysis.matches(0, 1)); // [{ leftStart: 0, rightStart: 1, length: 2 }]
     /// ```
@@ -155,6 +160,9 @@ impl Analysis {
 ///
 /// @example
 /// ```ts
+/// import init, { analyze } from "@dodona/dolos-core";
+///
+/// await init();
 /// using analysis = analyze([[1, 2, 3, 4], [9, 2, 3, 4]], null, {
 ///   minMatchLength: 2,
 ///   keepMatches: false,
@@ -228,6 +236,9 @@ pub struct PairResult {
 ///
 /// @example
 /// ```ts
+/// import init, { analyzePair } from "@dodona/dolos-core";
+///
+/// await init();
 /// const { metrics, matches } = analyzePair(
 ///   { fingerprints: [1, 2, 3, 4], ignored: [] },
 ///   { fingerprints: [9, 2, 3, 4], ignored: [[3, 4]] },
