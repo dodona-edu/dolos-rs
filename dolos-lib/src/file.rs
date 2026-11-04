@@ -155,7 +155,8 @@ mod tests {
     #[rstest]
     #[case::cpp_with_headers(&["a.cpp", "b.cpp", "c.cpp", "d.cpp", "a.h", "b.h", "c.h"], Language::Cpp)]
     #[case::c_with_headers(&["a.c", "b.c", "a.h", "b.h", "c.h"], Language::C)]
-    #[case::unknown_majority(&["a.py", "b.py", "x.md", "y.md", "z.md"], Language::Python)]
+    #[case::unknown_majority(&["a.py", "b.py", "x.csv", "y.csv", "z.csv"], Language::Python)]
+    #[case::text(&["a.txt", "b.md", "c.py"], Language::Char)]
     #[case::no_extension(&["Makefile", "a.py"], Language::Python)]
     fn detect_language_picks_majority(#[case] paths: &[&str], #[case] expected: Language) {
         assert_eq!(file_set(paths).detect_language().unwrap(), expected);
@@ -171,7 +172,7 @@ mod tests {
 
     #[test]
     fn detect_language_rejects_unknown_extensions() {
-        let err = file_set(&["README.md", "Makefile"])
+        let err = file_set(&["data.csv", "Makefile"])
             .detect_language()
             .unwrap_err();
         assert!(

@@ -7,7 +7,7 @@ use crate::reader::Dataset;
 use crate::report::Report;
 use crate::winnowing::fingerprints::{Fingerprint, Winnow};
 use crate::winnowing::region::Region;
-use crate::winnowing::tokenizer::{Tokenizer, Tokens};
+use crate::winnowing::tokenizer::Tokenizer;
 use std::fmt;
 use std::io::{Error, Result};
 use std::ops::Range;
@@ -140,8 +140,7 @@ impl Dolos {
         keep_locations: bool,
     ) -> (Vec<Fingerprint>, Option<Vec<Region>>) {
         self.tokenizer
-            .parse(content)
-            .tokens(self.metadata.include_comments)
+            .tokenize(content, self.metadata.include_comments)
             .winnow(
                 self.metadata.kgram_length,
                 self.metadata.kgrams_in_window,

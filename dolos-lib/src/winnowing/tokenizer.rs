@@ -12,22 +12,51 @@ pub struct Token {
     pub location: Region,
 }
 
-pub struct Tokenizer {
-    parser: Parser,
+/// The tokenizer of one language: a tree-sitter parser, or the character tokenizer of
+/// [`Language::Char`].
+pub enum Tokenizer {
+    TreeSitter(Parser),
+    Char,
 }
 
 impl Tokenizer {
     pub fn new(language: Language) -> Self {
+        let Some(grammar) = language.tree_sitter_language() else {
+            return Tokenizer::Char;
+        };
         let mut parser = Parser::new();
-        parser
-            .set_language(&language.tree_sitter_language().into())
-            .expect("set language");
-        Tokenizer { parser }
+        parser.set_language(&grammar.into()).expect("set language");
+        Tokenizer::TreeSitter(parser)
     }
 
-    pub fn parse(&mut self, content: &str) -> Tree {
-        self.parser.parse(content, None).expect("tree")
+    /// Tokenize `content`. `include_comments` has no effect on [`Tokenizer::Char`].
+    pub fn tokenize(&mut self, content: &str, include_comments: bool) -> Vec<Token> {
+        match self {
+            Tokenizer::TreeSitter(parser) => parser
+                .parse(content, None)
+                .expect("tree")
+                .tokens(include_comments),
+            Tokenizer::Char => char_tokens(content),
+        }
     }
+}
+
+/// Split `content` on `\n` and make one token for each character of each line.
+/// The region of a token covers the bytes of its character.
+fn char_tokens(content: &str) -> Vec<Token> {
+    content
+        .split('\n')
+        .enumerate()
+        .flat_map(|(row, line)| {
+            line.char_indices().map(move |(column, c)| Token {
+                name: c.to_string(),
+                location: Region::new(
+                    Point::new(row, column),
+                    Point::new(row, column + c.len_utf8()),
+                ),
+            })
+        })
+        .collect()
 }
 
 fn recursive_add<'a: 'b, 'b>(
@@ -96,7 +125,7 @@ mod tests {
     #[test]
     fn tokens_wrap_every_named_node_in_brackets() {
         let mut tokenizer = Tokenizer::new(Language::Javascript);
-        let actual = tokenizer.parse("1").tokens(false);
+        let actual = tokenizer.tokenize("1", false);
 
         let r00 = Region::new(Point::new(0, 0), Point::new(0, 0));
         let r01 = Region::new(Point::new(0, 0), Point::new(0, 1));
@@ -119,12 +148,33 @@ mod tests {
     }
 
     #[test]
+    fn char_tokens_cover_one_character_each() {
+        let mut tokenizer = Tokenizer::new(Language::Char);
+        let actual = tokenizer.tokenize("é a\n\nb\r", false);
+
+        let token = |name: &str, row, start, end| Token {
+            name: name.to_string(),
+            location: Region::new(Point::new(row, start), Point::new(row, end)),
+        };
+        // `é` is two bytes. The empty line gives no tokens. `\r` is a token.
+        let expected = vec![
+            token("é", 0, 0, 2),
+            token(" ", 0, 2, 3),
+            token("a", 0, 3, 4),
+            token("b", 2, 0, 1),
+            token("\r", 2, 1, 2),
+        ];
+
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
     fn token_locations_advance_through_the_file() {
         // region_from_kgram takes the start of the first token of a kgram and
         // the end of the last one, which needs a stream in source order.
         let mut tokenizer = Tokenizer::new(Language::Javascript);
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
-        let tokens = tokenizer.parse(&content).tokens(false);
+        let tokens = tokenizer.tokenize(&content, false);
 
         for pair in tokens.windows(2) {
             assert!(
@@ -144,7 +194,7 @@ mod tests {
                 .unwrap();
         let mut tokenizer = Tokenizer::new(Language::Javascript);
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
-        let actual = tokenizer.parse(&content).tokens(false);
+        let actual = tokenizer.tokenize(&content, false);
         assert_eq!(actual, expected);
     }
 
@@ -158,7 +208,7 @@ mod tests {
 
         let mut tokenizer = Tokenizer::new(Language::Javascript);
         let content = std::fs::read_to_string("fixtures/sample1.js").unwrap();
-        let tokens = tokenizer.parse(&content).tokens(false);
+        let tokens = tokenizer.tokenize(&content, false);
 
         write("fixtures/sample.tokens.json", &tokens);
 

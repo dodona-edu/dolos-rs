@@ -88,7 +88,7 @@ impl Winnow for Vec<Token> {
 mod tests {
     use super::*;
     use crate::winnowing::region::Region;
-    use crate::winnowing::tokenizer::{Tokenizer, Tokens};
+    use crate::winnowing::tokenizer::Tokenizer;
     use rstest::rstest;
     use std::path::Path;
     use tree_sitter_grammars::Language;
@@ -112,7 +112,7 @@ mod tests {
         .unwrap();
 
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
-        let (hashes, locations) = tokenizer.parse(&content).tokens(false).winnow(k, w, true);
+        let (hashes, locations) = tokenizer.tokenize(&content, false).winnow(k, w, true);
 
         let locations = locations.unwrap();
 
@@ -134,7 +134,7 @@ mod tests {
         // Fragment::resolve needs every location well formed (start <= end) and in order.
         let mut tokenizer = Tokenizer::new(Language::Javascript);
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
-        let (_, locations) = tokenizer.parse(&content).tokens(false).winnow(k, w, true);
+        let (_, locations) = tokenizer.tokenize(&content, false).winnow(k, w, true);
         let locations = locations.unwrap();
 
         for location in &locations {
