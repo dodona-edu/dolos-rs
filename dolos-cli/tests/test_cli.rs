@@ -1,5 +1,6 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
+use rstest::rstest;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -163,8 +164,66 @@ fn invalid_options_fail_the_process() {
 
 #[test]
 fn library_errors_print_only_the_message() {
-    dolos_run(&[SAMPLE1, SAMPLE2], &["-l", "python"])
+    dolos_run(&[SAMPLE1, SAMPLE2], &["-l", "python", "-qq"])
         .assert()
         .code(1)
         .stderr("error: need at least 2 python files to compare\n");
+}
+
+#[test]
+fn terminal_output_numbers_the_steps() {
+    dolos_run(&[SAMPLE1, SAMPLE2], &[])
+        .assert()
+        .success()
+        .stderr(
+            "[1/3] reading 2 files\n\
+         [2/3] fingerprinting 2 javascript files\n\
+         [3/3] comparing 1 pair\n",
+        );
+}
+
+#[rstest]
+#[case::template(&["-i", SAMPLE1], "[4/4] comparing 1 pair")]
+#[case::csv(&["-f", "csv"], "[4/4] writing the report to")]
+#[case::csv_and_template(&["-f", "csv", "-i", SAMPLE1], "[5/5] writing the report to")]
+fn the_last_step_completes_the_count(#[case] args: &[&str], #[case] last_step: &str) {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = tmp.path().join("report");
+    let output = dolos_run(&[SAMPLE1, SAMPLE2], args)
+        .args(["-o", report_dir.to_str().unwrap()])
+        .output()
+        .unwrap();
+
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(
+        stderr.lines().last().unwrap().starts_with(last_step),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn quiet_hides_the_steps_but_not_the_warnings() {
+    dolos_run(&[SAMPLE1, SAMPLE2], &["-q", "-M", "0.5"])
+        .assert()
+        .success()
+        .stderr(predicate::str::starts_with(
+            "warning: the maximum fingerprint percentage has no use",
+        ));
+}
+
+#[test]
+fn unreadable_files_are_skipped_with_a_warning() {
+    let tmp = TempDir::new().unwrap();
+    std::fs::copy(SAMPLE1, tmp.path().join("a.js")).unwrap();
+    std::fs::copy(SAMPLE2, tmp.path().join("b.js")).unwrap();
+    std::fs::write(tmp.path().join("c.js"), b"let x = \"\xff\";").unwrap();
+
+    dolos_run(&[tmp.path().to_str().unwrap()], &["-q"])
+        .assert()
+        .success()
+        .stderr(
+            predicate::str::contains("warning: skipped '").and(predicate::str::contains(
+                "c.js': stream did not contain valid UTF-8",
+            )),
+        );
 }

@@ -7,6 +7,10 @@
 //! Each supported [`Language`] is behind a `lang-*` feature. The
 //! `all-languages` feature enables all of them.
 //!
+//! The crate logs the steps of an analysis and its warnings, such as skipped
+//! files, through the [`log`] crate. It prints nothing unless the
+//! application installs a logger. A step record carries a `step` key.
+//!
 //! # Examples
 //!
 //! ```

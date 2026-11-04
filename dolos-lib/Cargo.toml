@@ -82,6 +82,7 @@ zip = "9.0.1"
 tempfile = "3.27.0"
 tree-sitter = "0.26.13"
 tree-sitter-grammars = { path = "../tree-sitter-grammars" }
+log = { version = "0.4.35", features = ["kv"] }
 
 [dev-dependencies]
 serde = "1.0.228"
