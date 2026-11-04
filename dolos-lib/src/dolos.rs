@@ -29,7 +29,8 @@ impl Dolos {
     ///
     /// Only the files of the configured language are analyzed. Without a
     /// configured language, the language that most file extensions belong to is
-    /// used.
+    /// used. Plain text ([`Language::Char`]) is used only when no file belongs
+    /// to another language.
     ///
     /// # Parameters
     ///

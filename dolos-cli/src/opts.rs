@@ -76,6 +76,7 @@ pub struct DolosArgs {
         value_parser = parse_language,
         long_help = "Programming language used in the submitted files. Detected automatically if not given. \
                      Use `char` for plain text, with one token per character. \
+                     Plain text is only detected when no file belongs to another language. \
                      Files without a matching extension are skipped."
     )]
     pub language: Option<Language>,
