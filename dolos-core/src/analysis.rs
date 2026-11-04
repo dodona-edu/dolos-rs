@@ -27,7 +27,9 @@ pub struct AnalysisOptions {
 /// [`PairMetrics`](crate::PairMetrics) of the pair from them. With
 /// [`keep_matches`](AnalysisOptions::keep_matches), the result also holds the
 /// matches themselves. It leaves out a match when another match of the pair
-/// contains it in both sequences.
+/// contains it in both sequences. The cost of that step grows with the number
+/// of matches times the number of matches that overlap in the left sequence,
+/// so sequences that repeat the same symbols many times make it slow.
 ///
 /// # Parameters
 ///

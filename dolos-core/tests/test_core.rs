@@ -132,7 +132,10 @@ fn overlapping_ignored_ranges_count_each_position_once() {
     assert_eq!(result.metrics()[(0, 1)].total_left, 1);
 }
 
-/// A random pair over a small alphabet, with some positions ignored.
+/// The pairs of the three sequences of a [`RandomCase`].
+const PAIRS: [(usize, usize); 3] = [(0, 1), (0, 2), (1, 2)];
+
+/// Three random sequences over a small alphabet, with some positions ignored.
 struct RandomCase {
     sequences: Vec<Vec<usize>>,
     ignored: Vec<Vec<bool>>,
@@ -146,7 +149,7 @@ impl RandomCase {
             let length = rng.random_range(0..=12);
             (0..length).map(|_| rng.random_range(0..alphabet)).collect()
         };
-        let sequences = vec![sequence(rng), sequence(rng)];
+        let sequences = vec![sequence(rng), sequence(rng), sequence(rng)];
         let ignored = sequences
             .iter()
             .map(|s| s.iter().map(|_| rng.random_range(0..8) == 0).collect())
@@ -177,25 +180,26 @@ impl RandomCase {
         analyze(&self.sequences, Some(&ranges), &options).unwrap()
     }
 
-    /// Whether position `i` of the left sequence and position `j` of the right
-    /// sequence hold the same symbol, and neither is ignored.
-    fn usable(&self, i: usize, j: usize) -> bool {
-        self.sequences[0][i] == self.sequences[1][j] && !self.ignored[0][i] && !self.ignored[1][j]
+    /// Whether position `i` of sequence `a` and position `j` of sequence `b`
+    /// hold the same symbol, and neither is ignored.
+    fn usable(&self, (a, i): (usize, usize), (b, j): (usize, usize)) -> bool {
+        self.sequences[a][i] == self.sequences[b][j] && !self.ignored[a][i] && !self.ignored[b][j]
     }
 
-    /// Every run of usable positions on a diagonal that cannot be extended and
-    /// is long enough, without the runs that another run contains.
-    fn brute_force_matches(&self) -> Vec<Match> {
-        let (left, right) = (self.sequences[0].len(), self.sequences[1].len());
+    /// Every run of usable positions of sequences `a` and `b` on a diagonal that
+    /// cannot be extended and is long enough, without the runs that another run
+    /// contains.
+    fn brute_force_matches(&self, a: usize, b: usize) -> Vec<Match> {
+        let usable = |i, j| self.usable((a, i), (b, j));
+        let (left, right) = (self.sequences[a].len(), self.sequences[b].len());
         let mut runs = Vec::new();
         for i in 0..left {
             for j in 0..right {
-                if !self.usable(i, j) || (i > 0 && j > 0 && self.usable(i - 1, j - 1)) {
+                if !usable(i, j) || (i > 0 && j > 0 && usable(i - 1, j - 1)) {
                     continue;
                 }
                 let mut length = 0;
-                while i + length < left && j + length < right && self.usable(i + length, j + length)
-                {
+                while i + length < left && j + length < right && usable(i + length, j + length) {
                     length += 1;
                 }
                 if length >= self.min_match_length {
@@ -226,19 +230,21 @@ fn matches_equal_a_brute_force_search_on_random_sequences() {
         let case = RandomCase::new(&mut rng);
         let result = case.analyze(true);
 
-        assert_eq!(
-            matches(&result, 0, 1),
-            case.brute_force_matches(),
-            "sequences {:?}, ignored {:?}, min_match_length {}",
-            case.sequences,
-            case.ignored,
-            case.min_match_length
-        );
+        for (a, b) in PAIRS {
+            assert_eq!(
+                matches(&result, a, b),
+                case.brute_force_matches(a, b),
+                "pair ({a}, {b}), sequences {:?}, ignored {:?}, min_match_length {}",
+                case.sequences,
+                case.ignored,
+                case.min_match_length
+            );
+        }
     }
 }
 
-// A match that another match contains covers no new position and is not
-// longer, so the remaining matches give the metrics of a run without matches.
+// The kept matches cover the positions and give the longest match that the
+// metrics of the same run without `keep_matches` report.
 #[test]
 fn remaining_matches_give_the_metrics_on_random_sequences() {
     let mut rng = StdRng::seed_from_u64(117);
@@ -246,28 +252,30 @@ fn remaining_matches_give_the_metrics_on_random_sequences() {
         let case = RandomCase::new(&mut rng);
         let with_matches = case.analyze(true);
         let without_matches = case.analyze(false);
-        let metrics = &without_matches.metrics()[(0, 1)];
 
-        let found = matches(&with_matches, 0, 1);
-        let left: HashSet<usize> = found
-            .iter()
-            .flat_map(|m| m.left_start..m.left_start + m.length)
-            .collect();
-        let right: HashSet<usize> = found
-            .iter()
-            .flat_map(|m| m.right_start..m.right_start + m.length)
-            .collect();
-        let longest = found.iter().map(|m| m.length).max().unwrap_or(0);
-        assert_eq!(
-            (left.len(), right.len(), longest),
-            (
-                metrics.overlap_left,
-                metrics.overlap_right,
-                metrics.longest_match
-            ),
-            "sequences {:?}, ignored {:?}",
-            case.sequences,
-            case.ignored
-        );
+        for (a, b) in PAIRS {
+            let metrics = &without_matches.metrics()[(a, b)];
+            let found = matches(&with_matches, a, b);
+            let left: HashSet<usize> = found
+                .iter()
+                .flat_map(|m| m.left_start..m.left_start + m.length)
+                .collect();
+            let right: HashSet<usize> = found
+                .iter()
+                .flat_map(|m| m.right_start..m.right_start + m.length)
+                .collect();
+            let longest = found.iter().map(|m| m.length).max().unwrap_or(0);
+            assert_eq!(
+                (left.len(), right.len(), longest),
+                (
+                    metrics.overlap_left,
+                    metrics.overlap_right,
+                    metrics.longest_match
+                ),
+                "pair ({a}, {b}), sequences {:?}, ignored {:?}",
+                case.sequences,
+                case.ignored
+            );
+        }
     }
 }

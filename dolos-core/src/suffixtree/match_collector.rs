@@ -164,11 +164,10 @@ impl<'a> MatchCollector<'a> {
 
 /// Remove every match that another match contains on both sides.
 ///
-/// `matches` must be sorted by left start, then right start. In that order,
-/// a match comes after every match that contains it.
+/// `matches` must be sorted by left start, then right start, with at most one
+/// match per pair of start positions.
 fn remove_contained(matches: &mut Vec<Match>) {
-    // The kept matches that end on the left after the start of the current
-    // match. Only these can contain it.
+    // The kept matches that end in the left sequence after the start of `m`.
     let mut open: Vec<Match> = Vec::new();
     matches.retain(|m| {
         open.retain(|n| n.left_start + n.length > m.left_start);
