@@ -36,8 +36,8 @@ pub struct Metadata {
     /// ignores it: the lower of the count and the percentage limit, and at
     /// least 1. `None` when neither limit is set.
     pub max_fingerprint_file_count: Option<usize>,
-    /// Path to the ignore / template file, if one was provided.
-    pub ignore: Option<PathBuf>,
+    /// The template paths, as configured. Empty without a template.
+    pub ignore: Vec<PathBuf>,
 }
 
 impl Metadata {
@@ -110,9 +110,15 @@ impl Metadata {
             ("maxFingerprintFileCount", optional(self.max_fingerprint_file_count.map(|v| v.to_string()))),
             ("sortBy", optional(self.sort_by.map(|s| format!("{s:?}")))),
             ("fragmentSortBy", optional(self.fragment_sort_by.map(|s| format!("{s:?}")))),
-            ("ignore", optional(self.ignore.as_ref().map(|p| p.display().to_string()))),
+            ("ignore", optional(joined(&self.ignore))),
         ]
     }
+}
+
+/// Join `paths` with commas, or `None` when there are none.
+fn joined(paths: &[PathBuf]) -> Option<String> {
+    let paths: Vec<_> = paths.iter().map(|p| p.display().to_string()).collect();
+    (!paths.is_empty()).then(|| paths.join(","))
 }
 
 /// Render an optional metadata field, returning `"null"` when absent.
