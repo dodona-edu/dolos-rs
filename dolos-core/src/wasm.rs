@@ -9,12 +9,6 @@ use std::ops::Range;
 use tsify::{Ts, Tsify};
 use wasm_bindgen::prelude::*;
 
-#[wasm_bindgen(typescript_custom_section)]
-const INTERVAL: &str = r#"
-/** A half-open range of positions, from `start` up to but not including `end`. */
-export interface Interval { start: number; end: number; }
-"#;
-
 /// The result of one `analyze` run.
 ///
 /// It holds the analysis in WebAssembly memory and converts one pair per call.
@@ -140,8 +134,10 @@ impl Analysis {
 /// @param sequences - The sequences to compare. There must be at least two.
 /// Every symbol is a non-negative integer below 4294967295.
 /// @param ignored - One list of intervals per sequence, or `null` to ignore
-/// nothing. Intervals may be empty, overlap and come in any order. No match
-/// covers an ignored position, and ignored positions do not count in the totals.
+/// nothing. An interval is a half-open `[start, end]` pair: from `start` up to
+/// but not including `end`. Intervals may be empty, overlap and come in any
+/// order. No match covers an ignored position, and ignored positions do not
+/// count in the totals.
 /// @param options - The minimum match length, and whether to keep the matches.
 ///
 /// @returns An `Analysis` that converts one pair per call. Release it with
@@ -150,8 +146,8 @@ impl Analysis {
 /// @throws {Error} when an argument does not match its type, or when the input
 /// breaks a rule: fewer than two sequences, a `minMatchLength` of 0, a sequence
 /// that contains 4294967295, an `ignored` list without exactly one entry per
-/// sequence, or an interval that starts after it ends or ends past the length
-/// of its sequence.
+/// sequence, an interval that is not a `[start, end]` pair, or an interval that
+/// starts after it ends or ends past the length of its sequence.
 ///
 /// @example
 /// ```ts
@@ -165,18 +161,47 @@ impl Analysis {
 #[wasm_bindgen]
 pub fn analyze(
     #[wasm_bindgen(unchecked_param_type = "number[][]")] sequences: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "Interval[][] | null")] ignored: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "[number, number][][] | null")] ignored: JsValue,
     options: Ts<AnalysisOptions>,
 ) -> Result<Analysis, JsError> {
     let options = options.to_rust()?;
     let sequences: Vec<Vec<Symbol>> = serde_wasm_bindgen::from_value(sequences)?;
-    let ignored: Option<Vec<Vec<Range<usize>>>> = serde_wasm_bindgen::from_value(ignored)?;
+    let ignored: Option<Vec<Vec<Vec<usize>>>> = serde_wasm_bindgen::from_value(ignored)?;
+    let ignored = ignored.map(to_ranges).transpose()?;
 
     Ok(Analysis(crate::analyze(
         &sequences,
         ignored.as_deref(),
         &options,
     )?))
+}
+
+/// The `[start, end]` intervals of every sequence as half-open ranges.
+fn to_ranges(ignored: Vec<Vec<Vec<usize>>>) -> io::Result<Vec<Vec<Range<usize>>>> {
+    ignored
+        .into_iter()
+        .enumerate()
+        .map(|(sequence, intervals)| {
+            intervals
+                .into_iter()
+                .map(|interval| to_range(sequence, interval))
+                .collect()
+        })
+        .collect()
+}
+
+/// One `[start, end]` interval of `sequence` as a half-open range, or an error
+/// when it does not hold exactly two positions.
+fn to_range(sequence: usize, interval: Vec<usize>) -> io::Result<Range<usize>> {
+    match interval[..] {
+        [start, end] => Ok(start..end),
+        _ => {
+            let message = format!(
+                "ignored interval {interval:?} of sequence {sequence} is not a [start, end] pair"
+            );
+            Err(io::Error::new(io::ErrorKind::InvalidInput, message))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -212,6 +237,21 @@ mod tests {
         assert!(
             out_of_range.to_string().contains("is out of range"),
             "{out_of_range}"
+        );
+    }
+
+    #[test]
+    fn to_ranges_rejects_an_interval_that_is_not_a_pair() {
+        let ranges = to_ranges(vec![vec![vec![0, 2], vec![3, 3]], vec![]]).unwrap();
+        assert_eq!(ranges, [vec![0..2, 3..3], vec![]]);
+
+        let rejected = to_ranges(vec![vec![], vec![vec![0, 2], vec![1, 2, 3]]]).unwrap_err();
+        assert_eq!(rejected.kind(), io::ErrorKind::InvalidInput);
+        assert!(
+            rejected
+                .to_string()
+                .contains("[1, 2, 3] of sequence 1 is not a [start, end] pair"),
+            "{rejected}"
         );
     }
 }

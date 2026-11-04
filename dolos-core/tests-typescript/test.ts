@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {analyze, type Interval, type PairMetrics,} from "../pkg-node/dolos_core.js";
+import {analyze, type PairMetrics,} from "../pkg-node/dolos_core.js";
 
 // One symbol per code unit of `text`.
 const symbols = (text: string): number[] => [...text].map((c) => c.charCodeAt(0));
@@ -36,7 +36,7 @@ test("a pair reports its counts, metrics and matches", () => {
 });
 
 test("an ignored interval splits a match and leaves its position out of the total", () => {
-  const ignored: Interval[][] = [[{ start: 2, end: 3 }], [{ start: 2, end: 3 }]];
+  const ignored: [number, number][][] = [[[2, 3]], [[2, 3]]];
 
   using analysis = analyze([symbols("ABCDE"), symbols("ABCDE")], ignored, {minMatchLength: 1, keepMatches: true});
 
@@ -58,6 +58,7 @@ test("unusable input throws a catchable Error", () => {
   assert.throws(() => analyze([[1], [4294967295]], null, {minMatchLength: 1, keepMatches: true}), /reserved end-of-sequence symbol/);
   assert.throws(() => analyze([[1], [2 ** 32]], null, {minMatchLength: 1, keepMatches: true}), /expected usize/);
   assert.throws(() => analyze([symbols("AB"), symbols("AB")], [], {minMatchLength: 1, keepMatches: true}), /cover 0 sequences/);
+  assert.throws(() => analyze([symbols("AB"), symbols("AB")], [[[2, 1]], []], {minMatchLength: 1, keepMatches: true}), /starts after it ends/);
 
   // The module still works after the rejections, so none of them trapped it.
   using analysis = analyze([symbols("AB"), symbols("AB")], null, {minMatchLength: 1, keepMatches: true});
@@ -69,4 +70,16 @@ test("indices that name no pair throw instead of reaching PairArray", () => {
 
   assert.throws(() => analysis.metrics(1, 1), /does not form a pair with itself/);
   assert.throws(() => analysis.metrics(0, 2), /out of range/);
+});
+
+test("an interval that is not a pair of positions throws a catchable Error", () => {
+  const throwsFor = (interval: unknown, message: RegExp) => {
+    const ignored = [[interval], []] as [number, number][][];
+    assert.throws(() => analyze([symbols("AB"), symbols("AB")], ignored, {minMatchLength: 1, keepMatches: true}), message);
+  };
+
+  throwsFor([1], /\[1\] of sequence 0 is not a \[start, end\] pair/);
+  throwsFor([1, 2, 3], /\[1, 2, 3\] of sequence 0 is not a \[start, end\] pair/);
+  throwsFor([-1, 2], /expected usize/);
+  throwsFor({ start: 0, end: 1 }, /expected a sequence/);
 });
