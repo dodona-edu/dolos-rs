@@ -60,8 +60,6 @@ fn iter_pairs_yields_every_pair_once_in_index_order() {
     );
 }
 
-// The suffix tree collects the matches in a `HashMap`, so without the sort the
-// order changes from one run to the next.
 #[test]
 fn matches_come_sorted_by_position_in_every_run() {
     let sequences = vec![
