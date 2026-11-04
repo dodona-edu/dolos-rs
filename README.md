@@ -65,44 +65,8 @@ This writes the npm package `@dodona/dolos-core` to `dolos-core/pkg/`, which
 git ignores. A local build takes the version of the crate. The publish
 workflow sets the npm version.
 
-The package loads its `.wasm` file in `init()`. Call it once, and await it
-before the first call into the package:
-
-```ts
-import init, { analyze } from "@dodona/dolos-core";
-
-await init();
-
-// `ignored` holds the positions to leave out, one list of half-open
-// `[start, end]` intervals per sequence, the same shape as the ignored
-// intervals in the CSV report. Pass `null` to ignore nothing.
-using analysis = analyze(fingerprints, ignored, { minMatchLength: 5, keepMatches: true });
-
-const metrics = analysis.metrics(0, 1);
-const matches = analysis.matches(0, 1);
-```
-
-`Analysis` holds the result in WebAssembly memory and converts one pair per call,
-so an analysis over hundreds of files stays cheap. Release it with `free()`, or
-declare it with `using` as above.
-
-For exactly two sequences, `analyzePair` returns the metrics and the matches as
-plain data, so there is nothing to release:
-
-```ts
-import init, { analyzePair } from "@dodona/dolos-core";
-
-await init();
-
-const { metrics, matches } = analyzePair(
-  { fingerprints: leftFingerprints, ignored: leftIgnored },
-  { fingerprints: rightFingerprints, ignored: rightIgnored },
-  { minMatchLength: 5 },
-);
-```
-
-The package works with any bundler and without one. Vite needs no plugin and no
-config change, also in a worker.
+The [dolos-core README](./dolos-core/README.md) shows how to use the package. It
+is also the README of the npm package.
 
 ## Who made this?
 
