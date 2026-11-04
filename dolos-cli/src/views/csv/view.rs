@@ -2,7 +2,7 @@ use crate::views::csv::line_index::LineIndex;
 use crate::views::csv::report_dir::ReportDirectory;
 use crate::views::csv::rows::{FileRow, FragmentRow, MetadataRow, PairRow};
 use crate::views::view::View;
-use dolos::Report;
+use dolos::{Pair, Report};
 use serde::Serialize;
 use std::io::{Error, Result};
 use std::path::{Path, PathBuf};
@@ -43,11 +43,11 @@ impl CsvView {
             .map(|(file, lines)| FileRow::new(file, lines));
         write_table(&dir.file("files.csv"), &FileRow::HEADER, files)?;
 
+        let file_count = report.files.len();
         let pairs = report
             .pairs
             .iter()
-            .enumerate()
-            .map(|(id, pair)| PairRow::new(id, pair));
+            .map(|pair| PairRow::new(pair_id(pair, file_count), pair));
         write_table(&dir.file("pairs.csv"), &PairRow::HEADER, pairs)?;
 
         if report.metadata.include_fragments {
@@ -72,6 +72,15 @@ impl View for CsvView {
         self.write(report)?;
         Ok(())
     }
+}
+
+/// The index of `pair` in the order (0,1), (0,2), ..., (0,n-1), (1,2), ... of its file ids.
+///
+/// This is the order in which the analysis creates the pairs, before `--sort-by`.
+/// `file_count` is the number of files in the report.
+fn pair_id(pair: &Pair, file_count: usize) -> usize {
+    let (left, right) = (pair.left_file.id, pair.right_file.id);
+    left * (2 * file_count - left - 1) / 2 + (right - left - 1)
 }
 
 /// Write `rows` to `path` as a CSV file with `header` as its first row.

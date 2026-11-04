@@ -24,7 +24,8 @@ impl<'a> MetadataRow<'a> {
 /// The last three are empty unless `--include-analysis-data` was given:
 /// - `fingerprints`: one hash per fingerprint, `[hash,...]`.
 /// - `fingerprintRegions`: `[startRow,startCol,endRow,endCol]` per fingerprint.
-/// - `ignoredIntervals`: one half-open `[start,end)` interval per ignored run.
+/// - `ignoredIntervals`: `[start,end]` per ignored run, a half-open interval of fingerprint
+///   indices.
 ///
 /// A region row is a zero-based line number. A region column is a zero-based offset in its line,
 /// in UTF-16 code units.
@@ -64,8 +65,10 @@ impl<'a> FileRow<'a> {
 
 /// One row of `pairs.csv`.
 ///
-/// - `id`: the index of the pair in the report.
+/// - `id`: the index of the pair in the order (0,1), (0,2), ..., (1,2), ... of its file ids.
+///   It does not depend on `--sort-by`.
 /// - `leftFileId`, `rightFileId`: the ids of the two files in `files.csv`.
+/// - `similarity`: `totalOverlap` divided by `totalLeft + totalRight`, between 0 and 1.
 /// - `longestFragment`: the length of the longest match, in fingerprints.
 /// - `overlapLeft`, `overlapRight`: the fingerprints of each file that a match covers.
 /// - `totalLeft`, `totalRight`: the fingerprints of each file that are not ignored.
