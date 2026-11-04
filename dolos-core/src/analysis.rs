@@ -26,7 +26,8 @@ pub struct AnalysisOptions {
 /// maximal matches, cut at ignored positions. It derives the
 /// [`PairMetrics`](crate::PairMetrics) of the pair from them. With
 /// [`keep_matches`](AnalysisOptions::keep_matches), the result also holds the
-/// matches themselves.
+/// matches themselves. It leaves out a match when another match of the pair
+/// contains it in both sequences.
 ///
 /// # Parameters
 ///

@@ -135,7 +135,8 @@ impl Analysis {
 /// The analysis finds the exact matches between every pair of sequences: the
 /// maximal matches, cut at ignored positions. It derives the similarity metrics
 /// of the pair from them. With `keepMatches`, the result also holds the matches
-/// themselves.
+/// themselves. It leaves out a match when another match of the pair contains it
+/// in both sequences.
 ///
 /// @param sequences - The sequences to compare. There must be at least two.
 /// Every symbol is a non-negative integer below 4294967295.
