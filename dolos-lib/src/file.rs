@@ -111,7 +111,6 @@ impl FileSet {
                 *counts.entry(language).or_default() += 1;
             }
         }
-        // Plain text counts only when no other language is present.
         if counts.len() > 1 {
             counts.remove(&Language::Char);
         }
@@ -170,7 +169,7 @@ mod tests {
 
     #[test]
     fn detect_language_rejects_a_tie() {
-        let err = file_set(&["a.h", "b.h", "c.h"])
+        let err = file_set(&["a.h", "b.h", "c.h", "README.md"])
             .detect_language()
             .unwrap_err();
         assert!(err.to_string().contains("[C, Cpp]"), "{err}");

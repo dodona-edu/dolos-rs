@@ -22,7 +22,7 @@ use std::ffi::OsStr;
 use std::path::Path;
 use tree_sitter_language::LanguageFn;
 
-/// An enum with all the supported programming languages.
+/// An enum with all the supported languages.
 /// Each variant with a grammar is only available if the corresponding `lang-*`
 /// feature is enabled.
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Clone, Copy)]
