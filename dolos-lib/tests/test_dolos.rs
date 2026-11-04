@@ -189,7 +189,10 @@ fn detected_language_skips_other_files() {
 #[test]
 fn tied_languages_are_ambiguous() {
     let err = Dolos::new(to_path_buf(JS_AND_PY), DolosConfig::default()).unwrap_err();
-    assert!(err.to_string().contains("[Javascript, Python]"), "{err}");
+    assert!(
+        err.to_string().contains("javascript and python each match"),
+        "{err}"
+    );
 }
 
 #[test]
@@ -216,7 +219,7 @@ fn too_few_files_after_filtering_are_rejected() {
         .unwrap();
     let err = Dolos::new(to_path_buf(MIXED), config).unwrap_err();
 
-    assert!(err.to_string().contains("at least 2 Python files"), "{err}");
+    assert!(err.to_string().contains("at least 2 python files"), "{err}");
 }
 
 #[test]

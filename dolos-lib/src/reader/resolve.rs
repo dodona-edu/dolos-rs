@@ -57,7 +57,7 @@ fn filenames_from_csv(csv_path: &Path) -> Result<Vec<PathBuf>> {
         .map_err(invalid)?
         .iter()
         .position(|h| h == "filename")
-        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "CSV missing 'filename' column"))?;
+        .ok_or_else(|| Error::new(ErrorKind::InvalidData, "csv file has no 'filename' column"))?;
 
     rdr.records()
         .map(|r| r.map_err(invalid).map(|r| dir.join(&r[filename_col])))
@@ -93,7 +93,7 @@ fn dir_name(dir: &Path) -> Result<String> {
     let dir = dir.canonicalize().map_err(|e| {
         Error::new(
             e.kind(),
-            format!("Could not resolve directory '{}': {e}", dir.display()),
+            format!("could not resolve directory '{}': {e}", dir.display()),
         )
     })?;
     Ok(dir
