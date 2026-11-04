@@ -78,8 +78,8 @@ test("an interval that is not a pair of positions throws a catchable Error", () 
     assert.throws(() => analyze([symbols("AB"), symbols("AB")], ignored, {minMatchLength: 1, keepMatches: true}), message);
   };
 
-  throwsFor([1], /\[1\] of sequence 0 is not a \[start, end\] pair/);
-  throwsFor([1, 2, 3], /\[1, 2, 3\] of sequence 0 is not a \[start, end\] pair/);
+  throwsFor([1], /invalid length 1, expected a \[start, end\] pair/);
+  throwsFor([1, 2, 3], /invalid length 3, expected a \[start, end\] pair/);
   throwsFor([-1, 2], /expected usize/);
-  throwsFor({ start: 0, end: 1 }, /expected a sequence/);
+  throwsFor({ start: 0, end: 1 }, /expected a \[start, end\] pair/);
 });

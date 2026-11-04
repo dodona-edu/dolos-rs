@@ -4,6 +4,8 @@
 //! private ones stay callable from the native tests.
 
 use crate::{AnalysisOptions, AnalysisResult, PairMetrics, Symbol};
+use serde::de::{self, Deserialize, Deserializer, SeqAccess, Visitor};
+use std::fmt;
 use std::io;
 use std::ops::Range;
 use tsify::{Ts, Tsify};
@@ -146,8 +148,8 @@ impl Analysis {
 /// @throws {Error} when an argument does not match its type, or when the input
 /// breaks a rule: fewer than two sequences, a `minMatchLength` of 0, a sequence
 /// that contains 4294967295, an `ignored` list without exactly one entry per
-/// sequence, an interval that is not a `[start, end]` pair, or an interval that
-/// starts after it ends or ends past the length of its sequence.
+/// sequence, or an interval that is not a `[start, end]` pair, starts after it
+/// ends or ends past the length of its sequence.
 ///
 /// @example
 /// ```ts
@@ -166,8 +168,8 @@ pub fn analyze(
 ) -> Result<Analysis, JsError> {
     let options = options.to_rust()?;
     let sequences: Vec<Vec<Symbol>> = serde_wasm_bindgen::from_value(sequences)?;
-    let ignored: Option<Vec<Vec<Vec<usize>>>> = serde_wasm_bindgen::from_value(ignored)?;
-    let ignored = ignored.map(to_ranges).transpose()?;
+    let ignored: Option<Vec<Vec<IgnoredInterval>>> = serde_wasm_bindgen::from_value(ignored)?;
+    let ignored = ignored.map(to_ranges);
 
     Ok(Analysis(crate::analyze(
         &sequences,
@@ -176,37 +178,59 @@ pub fn analyze(
     )?))
 }
 
-/// The `[start, end]` intervals of every sequence as half-open ranges.
-fn to_ranges(ignored: Vec<Vec<Vec<usize>>>) -> io::Result<Vec<Vec<Range<usize>>>> {
-    ignored
-        .into_iter()
-        .enumerate()
-        .map(|(sequence, intervals)| {
-            intervals
-                .into_iter()
-                .map(|interval| to_range(sequence, interval))
-                .collect()
-        })
-        .collect()
+/// A half-open `[start, end]` interval of ignored positions.
+///
+/// It deserializes from a list of exactly two positions.
+#[derive(Debug)]
+struct IgnoredInterval(Range<usize>);
+
+impl<'de> Deserialize<'de> for IgnoredInterval {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_seq(IgnoredIntervalVisitor)
+    }
 }
 
-/// One `[start, end]` interval of `sequence` as a half-open range, or an error
-/// when it does not hold exactly two positions.
-fn to_range(sequence: usize, interval: Vec<usize>) -> io::Result<Range<usize>> {
-    match interval[..] {
-        [start, end] => Ok(start..end),
-        _ => {
-            let message = format!(
-                "ignored interval {interval:?} of sequence {sequence} is not a [start, end] pair"
-            );
-            Err(io::Error::new(io::ErrorKind::InvalidInput, message))
-        }
+struct IgnoredIntervalVisitor;
+
+impl<'de> Visitor<'de> for IgnoredIntervalVisitor {
+    type Value = IgnoredInterval;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a [start, end] pair")
     }
+
+    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let start = seq
+            .next_element()?
+            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+        let end = seq
+            .next_element()?
+            .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+
+        let mut length = 2;
+        while seq.next_element::<de::IgnoredAny>()?.is_some() {
+            length += 1;
+        }
+        if length != 2 {
+            return Err(de::Error::invalid_length(length, &self));
+        }
+
+        Ok(IgnoredInterval(start..end))
+    }
+}
+
+/// The ignored intervals of every sequence as half-open ranges.
+fn to_ranges(ignored: Vec<Vec<IgnoredInterval>>) -> Vec<Vec<Range<usize>>> {
+    ignored
+        .into_iter()
+        .map(|intervals| intervals.into_iter().map(|interval| interval.0).collect())
+        .collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::de::value::SeqDeserializer;
 
     /// An analysis over one sequence per string, one symbol per byte.
     fn run_analysis(inputs: &[&str], keep_matches: bool) -> Analysis {
@@ -241,17 +265,22 @@ mod tests {
     }
 
     #[test]
-    fn to_ranges_rejects_an_interval_that_is_not_a_pair() {
-        let ranges = to_ranges(vec![vec![vec![0, 2], vec![3, 3]], vec![]]).unwrap();
-        assert_eq!(ranges, [vec![0..2, 3..3], vec![]]);
+    fn ignored_interval_rejects_a_list_that_is_not_a_pair() {
+        let deserialize = |positions: Vec<usize>| {
+            IgnoredInterval::deserialize(SeqDeserializer::<_, de::value::Error>::new(
+                positions.into_iter(),
+            ))
+            .unwrap_err()
+            .to_string()
+        };
 
-        let rejected = to_ranges(vec![vec![], vec![vec![0, 2], vec![1, 2, 3]]]).unwrap_err();
-        assert_eq!(rejected.kind(), io::ErrorKind::InvalidInput);
-        assert!(
-            rejected
-                .to_string()
-                .contains("[1, 2, 3] of sequence 1 is not a [start, end] pair"),
-            "{rejected}"
+        assert_eq!(
+            deserialize(vec![1]),
+            "invalid length 1, expected a [start, end] pair"
+        );
+        assert_eq!(
+            deserialize(vec![1, 2, 3]),
+            "invalid length 3, expected a [start, end] pair"
         );
     }
 }
