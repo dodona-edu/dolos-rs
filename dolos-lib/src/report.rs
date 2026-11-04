@@ -7,8 +7,6 @@ use std::cmp::Reverse;
 use std::rc::Rc;
 
 /// The result of one pair of files.
-///
-/// The left file is the one with the smaller [`File::id`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct Pair {
     /// The file with the smaller id.

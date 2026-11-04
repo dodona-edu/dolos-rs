@@ -1,9 +1,8 @@
 //! Dolos detects plagiarism in source code.
 //!
-//! [`Dolos`] reads a set of files, tokenizes them with tree-sitter and reduces
-//! each file to a sequence of [`Fingerprint`]s. [`Dolos::build_report`]
-//! compares every pair of files and returns a [`Report`] with the
-//! [`PairMetrics`] of each [`Pair`]. All metrics count fingerprints.
+//! It compares every pair of files in a set and reports how similar they are.
+//! It tokenizes each file with tree-sitter and reduces it to a sequence of
+//! [`Fingerprint`]s. All metrics count fingerprints.
 //!
 //! Each supported [`Language`] is behind a `lang-*` feature. The
 //! `all-languages` feature enables all of them.

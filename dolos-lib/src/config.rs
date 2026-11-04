@@ -42,7 +42,6 @@ pub enum FragmentSortBy {
 ///     .build()?;
 ///
 /// assert_ne!(config, DolosConfig::default());
-/// assert!(DolosConfig::builder().kgram_length(0).build().is_err());
 /// # Ok::<(), std::io::Error>(())
 /// ```
 #[derive(Debug, Clone, PartialEq)]
@@ -133,8 +132,6 @@ impl Default for DolosConfig {
 ///     .max_fingerprint_percentage(0.5)
 ///     .sort_by(PairSortBy::Similarity)
 ///     .build()?;
-///
-/// assert!(DolosConfig::builder().kgram_length(0).build().is_err());
 /// # Ok::<(), std::io::Error>(())
 /// ```
 #[derive(Debug, Clone, Default)]

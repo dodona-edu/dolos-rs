@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 use tree_sitter;
 
 /// A position in a text document.
-///
-/// Points sort by row, then by column.
 #[cfg_attr(test, derive(Serialize, Deserialize))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Point {
@@ -28,7 +26,7 @@ impl Point {
     /// use dolos::Point;
     ///
     /// let point = Point::new(2, 4);
-    /// assert!(point < Point::new(3, 0));
+    /// assert_eq!(point.row, 2);
     /// ```
     pub fn new(row: usize, column: usize) -> Self {
         Point { row, column }

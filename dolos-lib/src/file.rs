@@ -9,8 +9,6 @@ use std::path::PathBuf;
 use tree_sitter_grammars::Language;
 
 /// One input file of an analysis.
-///
-/// Files compare and sort by their [`relative_path`](Self::relative_path).
 #[derive(Clone)]
 pub struct File {
     /// Zero-based index assigned in the order the file was added to the analysis.
@@ -50,6 +48,7 @@ impl Hash for File {
     }
 }
 
+/// Compares the [`relative_path`](File::relative_path) of the files.
 impl PartialEq for File {
     fn eq(&self, other: &Self) -> bool {
         self.relative_path == other.relative_path
@@ -64,6 +63,7 @@ impl PartialOrd for File {
     }
 }
 
+/// Orders the files by their [`relative_path`](File::relative_path).
 impl Ord for File {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.relative_path.cmp(&other.relative_path)
