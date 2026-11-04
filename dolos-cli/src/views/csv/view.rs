@@ -31,7 +31,11 @@ impl CsvView {
         let files = report.files.iter().map(|file| FileRow::new(file));
         write_table(&dir.file("files.csv"), &FileRow::HEADER, files)?;
 
-        let pairs = report.pairs.iter().map(PairRow::new);
+        let pairs = report
+            .pairs
+            .iter()
+            .enumerate()
+            .map(|(id, pair)| PairRow::new(id, pair));
         write_table(&dir.file("pairs.csv"), &PairRow::HEADER, pairs)?;
 
         if report.metadata.include_fragments {

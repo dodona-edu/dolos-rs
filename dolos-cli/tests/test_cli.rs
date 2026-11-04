@@ -65,12 +65,25 @@ fn csv_output_writes_the_headers() {
     );
     assert_csv_header(
         &report_dir.join("pairs.csv"),
-        &["file1_id", "file1_path", "file2_id", "file2_path", "similarity", "longest", "total_left", "total_right", "overlap_left", "overlap_right"],
+        &["id", "leftFileId", "rightFileId", "similarity", "longestFragment", "overlapLeft", "overlapRight", "totalLeft", "totalRight", "totalOverlap"],
     );
     assert_csv_header(
         &report_dir.join("fragments.csv"),
         &["file1_id", "file1_path", "file1_start_point", "file1_end_point", "file2_id", "file2_path", "file2_start_point", "file2_end_point", "fingerprint_count"],
     );
+}
+
+#[test]
+fn pairs_csv_holds_the_pair_id_and_the_total_overlap() {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = csv_report(&tmp, &[]);
+
+    let rows = read_rows(&report_dir.join("pairs.csv"));
+    assert_eq!(rows.len(), 1);
+    let row = &rows[0];
+    assert_eq!((&row[0], &row[1], &row[2]), ("0", "0", "1"));
+    let number = |i: usize| row[i].parse::<usize>().unwrap();
+    assert_eq!(number(9), number(5) + number(6));
 }
 
 #[test]
