@@ -14,11 +14,19 @@ pub struct Template {
 
 impl Template {
     /// Read the template from `paths`, in the forms that [`Source::read`]
-    /// accepts, and keep only the files of `language`.
+    /// accepts, and keep only the files of `language`. Without paths, the
+    /// template is empty.
     ///
     /// # Errors
     /// Fails when the paths cannot be read or no file of `language` remains.
     pub fn create(paths: Vec<PathBuf>, language: Language) -> Result<Self> {
+        if paths.is_empty() {
+            return Ok(Self {
+                file_set: FileSet::new(PathBuf::new(), Vec::new()),
+                _temp_dir: None,
+            });
+        }
+
         let Source { mut file_set, temp_dir, .. } = Source::read(paths)
             .map_err(|e| Error::new(e.kind(), format!("Could not read the template: {e}")))?;
 

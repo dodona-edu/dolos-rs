@@ -108,11 +108,7 @@ impl Dolos {
     pub fn new(files: Vec<PathBuf>, config: DolosConfig) -> Result<Self> {
         let dataset = Dataset::create(files, config.language)?;
         let metadata = Metadata::from_config(&config, &dataset);
-        let template = if config.template.is_empty() {
-            None
-        } else {
-            Some(Template::create(config.template, metadata.language)?)
-        };
+        let template = Template::create(config.template, metadata.language)?;
 
         let tokenizer = Tokenizer::new(metadata.language);
 
@@ -133,9 +129,7 @@ impl Dolos {
 
         dolos.add_files(&dataset.file_set)?;
 
-        if let Some(template) = template {
-            dolos.add_template(&template.file_set)?;
-        }
+        dolos.add_template(&template.file_set)?;
 
         Ok(dolos)
     }
