@@ -25,23 +25,15 @@ impl Dataset {
     /// [`Source::read`] accepts.
     ///
     /// Only the files of `language` are kept. When `language` is `None`, the
-    /// language that most file extensions belong to is used.
-    pub fn create(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
-        let Source { name, file_set, temp_dir } = Source::read(paths)?;
-        Self::new(name, file_set, temp_dir, language)
-    }
-
-    /// Select the language and keep only the files of that language.
-    /// Without a `name`, the dataset is named after the files that remain.
+    /// language that most file extensions belong to is used. Without a name
+    /// from the input, the dataset is named after the files that remain.
     ///
     /// # Errors
-    /// Fails when the language cannot be detected or fewer than 2 files remain.
-    fn new(
-        name: Option<String>,
-        mut file_set: FileSet,
-        temp_dir: Option<TempDir>,
-        language: Option<Language>,
-    ) -> Result<Self> {
+    /// Fails when the paths cannot be read, the language cannot be detected or
+    /// fewer than 2 files remain.
+    pub fn create(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
+        let Source { name, mut file_set, temp_dir } = Source::read(paths)?;
+
         let language = match language {
             Some(language) => language,
             None => file_set.detect_language()?,
