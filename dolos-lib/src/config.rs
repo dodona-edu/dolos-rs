@@ -52,7 +52,7 @@ pub struct DolosConfig {
     pub(crate) language: Option<Language>,
     pub(crate) max_fingerprint_count: Option<usize>,
     pub(crate) max_fingerprint_percentage: Option<f64>,
-    pub(crate) ignore: Vec<PathBuf>,
+    pub(crate) template: Vec<PathBuf>,
     pub(crate) include_comments: bool,
     pub(crate) compare: bool,
     pub(crate) include_analysis_data: bool,
@@ -104,7 +104,7 @@ impl Default for DolosConfig {
             language: None,
             max_fingerprint_count: None,
             max_fingerprint_percentage: None,
-            ignore: Vec::new(),
+            template: Vec::new(),
             include_comments: false,
             compare: false,
             include_analysis_data: false,
@@ -243,12 +243,12 @@ impl DolosConfigBuilder {
     ///   template. [`build`](Self::build) does not check the paths.
     ///   [`Dolos::new`](crate::Dolos::new) returns an error when it cannot read
     ///   them.
-    pub fn ignore<I, P>(mut self, paths: I) -> Self
+    pub fn template<I, P>(mut self, paths: I) -> Self
     where
         I: IntoIterator<Item = P>,
         P: Into<PathBuf>,
     {
-        self.config.ignore = paths.into_iter().map(Into::into).collect();
+        self.config.template = paths.into_iter().map(Into::into).collect();
         self
     }
 

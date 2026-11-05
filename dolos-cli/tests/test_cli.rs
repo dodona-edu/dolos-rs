@@ -107,15 +107,15 @@ fn analysis_data_columns_hold_four_region_numbers_per_fingerprint() {
 }
 
 #[test]
-fn repeated_ignore_option_gives_a_template_of_several_files() {
+fn repeated_template_option_gives_a_template_of_several_files() {
     let tmp = TempDir::new().unwrap();
-    let report_dir = csv_report(&tmp, &["-i", SAMPLE1, "-i", SAMPLE2]);
+    let report_dir = csv_report(&tmp, &["-t", SAMPLE1, "-t", SAMPLE2]);
 
-    let ignore = read_rows(&report_dir.join("metadata.csv"))
+    let template = read_rows(&report_dir.join("metadata.csv"))
         .into_iter()
-        .find(|row| &row[0] == "ignore")
+        .find(|row| &row[0] == "template")
         .unwrap();
-    assert_eq!(&ignore[1], format!("{SAMPLE1},{SAMPLE2}"));
+    assert_eq!(&template[1], &format!(r#"["{SAMPLE1}","{SAMPLE2}"]"#));
 }
 
 #[test]

@@ -70,7 +70,7 @@ impl Dolos {
     /// - [`InvalidInput`] when fewer than 2 files of the language remain. This
     ///   includes one regular file as input.
     ///
-    /// Reading the [`ignore`](crate::DolosConfigBuilder::ignore) template:
+    /// Reading the [`template`](crate::DolosConfigBuilder::template):
     ///
     /// - The errors of reading the input, except that one regular file is
     ///   allowed.
@@ -108,6 +108,11 @@ impl Dolos {
     pub fn new(files: Vec<PathBuf>, config: DolosConfig) -> Result<Self> {
         let dataset = Dataset::create(files, config.language)?;
         let metadata = Metadata::from_config(&config, &dataset);
+        let template = if config.template.is_empty() {
+            None
+        } else {
+            Some(Template::create(config.template, metadata.language)?)
+        };
 
         let tokenizer = Tokenizer::new(metadata.language);
 
@@ -128,8 +133,7 @@ impl Dolos {
 
         dolos.add_files(dataset.file_set)?;
 
-        if !config.ignore.is_empty() {
-            let template = Template::create(config.ignore, dolos.metadata.language)?;
+        if let Some(template) = template {
             dolos.add_template(&template.file_set)?;
         }
 
