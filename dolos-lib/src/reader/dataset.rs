@@ -1,4 +1,4 @@
-use crate::file::FileSet;
+use crate::file::{FileSet, language_name};
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
@@ -34,10 +34,7 @@ impl Dataset {
     /// language that most file extensions belong to is used.
     pub fn create(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
         match paths.as_slice() {
-            [] => Err(Error::new(
-                ErrorKind::InvalidInput,
-                "No input paths provided",
-            )),
+            [] => Err(Error::new(ErrorKind::InvalidInput, "no input paths given")),
             [path] => Self::from_single_path(path, language),
             _ => Self::from_multi_path(paths, language),
         }
@@ -76,7 +73,7 @@ impl Dataset {
 
         Err(Error::new(
             ErrorKind::InvalidInput,
-            "A single path must be a directory, a CSV file, or a supported archive \
+            "a single path must be a directory, a CSV file or a supported archive \
                  (.zip, .tar, .tar.gz, .tgz, .tar.bz2, .tbz, .tbz2)",
         ))
     }
@@ -101,7 +98,10 @@ impl Dataset {
         if file_set.relative_paths.len() < 2 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("Need at least 2 {language:?} files to compare."),
+                format!(
+                    "need at least 2 {} files to compare",
+                    language_name(language)
+                ),
             ));
         }
 

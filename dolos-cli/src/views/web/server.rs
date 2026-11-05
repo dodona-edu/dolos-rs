@@ -1,5 +1,5 @@
+use anyhow::Result;
 use axum::Router;
-use std::io::{Error, Result};
 use std::path::{Path, PathBuf};
 use tower_http::services::ServeDir;
 
@@ -31,7 +31,8 @@ pub fn serve(report_dir: &Path, server: &Server) -> Result<()> {
         }
 
         println!("Press Ctrl-C to exit.");
-        axum::serve(listener, router).await.map_err(Error::other)
+        axum::serve(listener, router).await?;
+        Ok(())
     })
 }
 
