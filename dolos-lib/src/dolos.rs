@@ -72,15 +72,15 @@ impl Dolos {
     ///
     /// Reading the [`template`](crate::DolosConfigBuilder::template):
     ///
-    /// - The errors of reading the input, except that one regular file is
-    ///   allowed.
+    /// - The errors of reading the input. An empty list gives no error: the
+    ///   analysis then has no template.
     /// - [`InvalidInput`] when no template file of the language remains.
     ///
     /// Reading the files:
     ///
-    /// - The I/O error of a failed input or template file read, for example
-    ///   [`NotFound`] for a file in the `filename` column of a CSV file that
-    ///   does not exist. A file that is not valid UTF-8 gives [`InvalidData`].
+    /// - The error of the read when an input or template file cannot be read,
+    ///   for example [`NotFound`] for a file in the `filename` column of a CSV
+    ///   file that does not exist.
     ///
     /// [`InvalidData`]: std::io::ErrorKind::InvalidData
     /// [`InvalidInput`]: std::io::ErrorKind::InvalidInput
