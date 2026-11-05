@@ -131,7 +131,7 @@ impl Dolos {
             tokenizer,
         };
 
-        dolos.add_files(dataset.file_set)?;
+        dolos.add_files(&dataset.file_set)?;
 
         if let Some(template) = template {
             dolos.add_template(&template.file_set)?;
@@ -157,24 +157,26 @@ impl Dolos {
             )
     }
 
-    /// Tokenize a source file and register it as a regular file in the analysis.
+    /// Tokenize the files of `file_set` and register them as the files of the analysis.
     ///
-    /// The path and content are added to `self.files`, the fingerprints to
+    /// The paths and contents are added to `self.files`, the fingerprints to
     /// `self.fingerprints`, and the locations to `self.locations` when they are kept.
-    fn add_file(&mut self, base_dir: &Path, relative: &Path) -> Result<()> {
-        let content = std::fs::read_to_string(base_dir.join(relative))?;
-        let (fingerprints, locations) = self.fingerprint(&content, self.locations.is_some());
+    fn add_files(&mut self, file_set: &FileSet) -> Result<()> {
+        for relative in &file_set.relative_paths {
+            let content = read_file(&file_set.base_dir, relative)?;
+            let (fingerprints, locations) = self.fingerprint(&content, self.locations.is_some());
 
-        self.fingerprints.push(fingerprints);
-        if let Some(locs) = self.locations.as_mut() {
-            locs.push(locations.expect("locations should be present when they are kept"));
+            self.fingerprints.push(fingerprints);
+            if let Some(locs) = self.locations.as_mut() {
+                locs.push(locations.expect("locations should be present when they are kept"));
+            }
+            self.files.push(File {
+                id: self.files.len(),
+                relative_path: relative.clone(),
+                content,
+                analysis_data: None,
+            });
         }
-        self.files.push(File {
-            id: self.files.len(),
-            relative_path: relative.to_path_buf(),
-            content,
-            analysis_data: None,
-        });
         Ok(())
     }
 
@@ -185,22 +187,9 @@ impl Dolos {
     /// do not appear in the report, and no fragment resolution is needed for them.
     fn add_template(&mut self, file_set: &FileSet) -> Result<()> {
         for relative in &file_set.relative_paths {
-            let path = file_set.base_dir.join(relative);
-            let content = std::fs::read_to_string(&path).map_err(|e| {
-                Error::new(
-                    e.kind(),
-                    format!("Could not read template file '{}': {e}", path.display()),
-                )
-            })?;
+            let content = read_file(&file_set.base_dir, relative)?;
             let (fingerprints, _) = self.fingerprint(&content, false);
             self.template_fingerprints.push(fingerprints);
-        }
-        Ok(())
-    }
-
-    fn add_files(&mut self, file_set: FileSet) -> Result<()> {
-        for relative in &file_set.relative_paths {
-            self.add_file(&file_set.base_dir, relative)?;
         }
         Ok(())
     }
@@ -283,6 +272,17 @@ impl Dolos {
         let files = self.files.into_iter().map(Rc::new).collect();
         Report::new(result.metrics(), fragments, files, self.metadata)
     }
+}
+
+/// Read the file at `relative` in `base_dir`.
+fn read_file(base_dir: &Path, relative: &Path) -> Result<String> {
+    let path = base_dir.join(relative);
+    std::fs::read_to_string(&path).map_err(|e| {
+        Error::new(
+            e.kind(),
+            format!("Could not read '{}': {e}", path.display()),
+        )
+    })
 }
 
 impl fmt::Debug for Dolos {
