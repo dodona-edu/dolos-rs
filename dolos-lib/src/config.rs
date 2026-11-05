@@ -243,11 +243,7 @@ impl DolosConfigBuilder {
     ///   template. [`build`](Self::build) does not check the paths.
     ///   [`Dolos::new`](crate::Dolos::new) returns an error when it cannot read
     ///   them.
-    pub fn template<I, P>(mut self, paths: I) -> Self
-    where
-        I: IntoIterator<Item = P>,
-        P: Into<PathBuf>,
-    {
+    pub fn template(mut self, paths: impl IntoIterator<Item = impl Into<PathBuf>>) -> Self {
         self.config.template = paths.into_iter().map(Into::into).collect();
         self
     }
