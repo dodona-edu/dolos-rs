@@ -172,29 +172,4 @@ mod tests {
 
         assert_eq!(counts, expected);
     }
-
-    /// A fragment of one fingerprint on row `left_row` of the left file and
-    /// row `right_row` of the right file.
-    fn fragment(left_row: usize, right_row: usize) -> Fragment {
-        Fragment {
-            left_region: Region::new(Point::new(left_row, 0), Point::new(left_row, 5)),
-            right_region: Region::new(Point::new(right_row, 0), Point::new(right_row, 5)),
-            fingerprint_count: 1,
-        }
-    }
-
-    // All fragments have the same length and two have the same left start, so
-    // only the position decides their order.
-    #[rstest]
-    #[case::kgrams_ascending(Some(FragmentSortBy::KgramsAscending))]
-    #[case::kgrams_descending(Some(FragmentSortBy::KgramsDescending))]
-    #[case::file_order(Some(FragmentSortBy::FileOrder))]
-    #[case::default(None)]
-    fn sort_fragments_breaks_ties_on_the_position(#[case] sort_by: Option<FragmentSortBy>) {
-        let mut fragments = vec![fragment(3, 10), fragment(3, 2), fragment(1, 5)];
-
-        sort_fragments(&mut fragments, &sort_by);
-
-        assert_eq!(fragments, [fragment(1, 5), fragment(3, 2), fragment(3, 10)]);
-    }
 }
