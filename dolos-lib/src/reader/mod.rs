@@ -1,9 +1,9 @@
 mod archive;
 mod dataset;
+mod input;
 mod resolve;
-mod source;
 mod template;
 
 pub use dataset::Dataset;
-pub use source::Source;
+pub use input::Input;
 pub use template::Template;

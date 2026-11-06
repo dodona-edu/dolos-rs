@@ -7,7 +7,7 @@ use super::{archive, resolve};
 
 /// The files that a list of input paths points to.
 #[derive(Debug)]
-pub struct Source {
+pub struct Input {
     /// The name of the directory, the CSV file or the archive. `None` for
     /// separate files.
     pub name: Option<String>,
@@ -16,7 +16,7 @@ pub struct Source {
     pub temp_dir: Option<TempDir>,
 }
 
-impl Source {
+impl Input {
     /// Read the files of `paths`. Accepted inputs:
     ///
     /// - **Several paths** or **one regular file** → each path is a file.
@@ -86,17 +86,17 @@ mod tests {
 
     #[test]
     fn read_accepts_a_single_regular_file() {
-        let source = Source::read(vec!["fixtures/sample1.js".into()]).unwrap();
-        assert_eq!(source.name, None);
+        let input = Input::read(vec!["fixtures/sample1.js".into()]).unwrap();
+        assert_eq!(input.name, None);
         assert_eq!(
-            source.file_set.relative_paths,
+            input.file_set.relative_paths,
             [PathBuf::from("fixtures/sample1.js")]
         );
     }
 
     #[test]
     fn read_rejects_a_missing_single_path() {
-        let err = Source::read(vec!["does_not_exist.js".into()]).unwrap_err();
+        let err = Input::read(vec!["does_not_exist.js".into()]).unwrap_err();
         assert_eq!(err.kind(), ErrorKind::NotFound);
     }
 }

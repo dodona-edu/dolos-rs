@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 use tree_sitter_grammars::Language;
 
-use super::{Source, resolve};
+use super::{Input, resolve};
 
 /// A named collection of source files in one language, ready for analysis.
 ///
@@ -22,7 +22,7 @@ pub struct Dataset {
 
 impl Dataset {
     /// Create a `Dataset` from the given input paths, in the forms that
-    /// [`Source::read`] accepts.
+    /// [`Input::read`] accepts.
     ///
     /// Only the files of `language` are kept. When `language` is `None`, the
     /// language that most file extensions belong to is used. Without a name
@@ -32,7 +32,7 @@ impl Dataset {
     /// Fails when the paths cannot be read, the language cannot be detected or
     /// fewer than 2 files remain.
     pub fn create(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
-        let Source { name, mut file_set, temp_dir } = Source::read(paths)?;
+        let Input { name, mut file_set, temp_dir } = Input::read(paths)?;
 
         let language = match language {
             Some(language) => language,

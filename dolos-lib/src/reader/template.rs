@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 use tree_sitter_grammars::Language;
 
-use super::Source;
+use super::Input;
 
 /// The template files in one language, whose fingerprints the analysis ignores.
 pub struct Template {
@@ -13,7 +13,7 @@ pub struct Template {
 }
 
 impl Template {
-    /// Read the template from `paths`, in the forms that [`Source::read`]
+    /// Read the template from `paths`, in the forms that [`Input::read`]
     /// accepts, and keep only the files of `language`. Without paths, the
     /// template is empty.
     ///
@@ -27,7 +27,7 @@ impl Template {
             });
         }
 
-        let Source { mut file_set, temp_dir, .. } = Source::read(paths)
+        let Input { mut file_set, temp_dir, .. } = Input::read(paths)
             .map_err(|e| Error::new(e.kind(), format!("Could not read the template: {e}")))?;
 
         file_set.retain_language(language);
