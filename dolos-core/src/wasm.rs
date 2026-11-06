@@ -5,13 +5,17 @@
 //! private ones stay callable from the native tests.
 
 use crate::{AnalysisOptions, AnalysisResult, Match, PairMetrics, Symbol};
-use serde::de::{self, SeqAccess, Visitor};
-use serde::{Deserialize, Deserializer, Serialize};
-use std::fmt;
+use serde::{Deserialize, Serialize};
 use std::io;
 use std::ops::Range;
 use tsify::{Ts, Tsify};
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(typescript_custom_section)]
+const INTERVAL: &str = r#"
+/** A half-open range of positions, from `start` up to but not including `end`. */
+export interface Interval { start: number; end: number; }
+"#;
 
 /// The result of one `analyze` run.
 ///
@@ -138,10 +142,8 @@ impl Analysis {
 /// @param sequences - The sequences to compare. There must be at least two.
 /// Every symbol is a non-negative integer below 4294967295.
 /// @param ignored - One list of intervals per sequence, or `null` to ignore
-/// nothing. An interval is a half-open `[start, end]` pair: from `start` up to
-/// but not including `end`. Intervals may be empty, overlap and come in any
-/// order. No match covers an ignored position, and ignored positions do not
-/// count in the totals.
+/// nothing. Intervals may be empty, overlap and come in any order. No match
+/// covers an ignored position, and ignored positions do not count in the totals.
 /// @param options - The minimum match length, and whether to keep the matches.
 ///
 /// @returns An `Analysis` that converts one pair per call. Release it with
@@ -150,8 +152,8 @@ impl Analysis {
 /// @throws {Error} when an argument does not match its type, or when the input
 /// breaks a rule: fewer than two sequences, a `minMatchLength` of 0, a sequence
 /// that contains 4294967295, an `ignored` list without exactly one entry per
-/// sequence, or an interval that is not a `[start, end]` pair, starts after it
-/// ends or ends past the length of its sequence.
+/// sequence, or an interval that starts after it ends or ends past the length
+/// of its sequence.
 ///
 /// @example
 /// ```ts
@@ -165,13 +167,12 @@ impl Analysis {
 #[wasm_bindgen]
 pub fn analyze(
     #[wasm_bindgen(unchecked_param_type = "number[][]")] sequences: JsValue,
-    #[wasm_bindgen(unchecked_param_type = "[number, number][][] | null")] ignored: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "Interval[][] | null")] ignored: JsValue,
     options: Ts<AnalysisOptions>,
 ) -> Result<Analysis, JsError> {
     let options = options.to_rust()?;
     let sequences: Vec<Vec<Symbol>> = serde_wasm_bindgen::from_value(sequences)?;
-    let ignored: Option<Vec<Vec<IgnoredInterval>>> = serde_wasm_bindgen::from_value(ignored)?;
-    let ignored = ignored.map(to_ranges);
+    let ignored: Option<Vec<Vec<Range<usize>>>> = serde_wasm_bindgen::from_value(ignored)?;
 
     Ok(Analysis(crate::analyze(
         &sequences,
@@ -187,10 +188,9 @@ pub struct PairSequence {
     /// below 4294967295.
     #[tsify(type = "number[]")]
     fingerprints: Vec<Symbol>,
-    /// The half-open `[start, end]` intervals of positions to leave out. Pass
-    /// `[]` to ignore nothing.
-    #[tsify(type = "[number, number][]")]
-    ignored: Vec<IgnoredInterval>,
+    /// The intervals of positions to leave out. Pass `[]` to ignore nothing.
+    #[tsify(type = "Interval[]")]
+    ignored: Vec<Range<usize>>,
 }
 
 /// The options of an `analyzePair` call.
@@ -207,8 +207,8 @@ pub struct PairOptions {
 pub struct PairResult {
     /// The similarity, totals, overlaps and longest match of the pair.
     metrics: PairMetrics,
-    /// The matches of the pair, in no specific order. Empty when the pair has
-    /// none.
+    /// The matches of the pair, sorted by `leftStart`, then `rightStart`, then
+    /// `length`. Empty when the pair has none.
     matches: Vec<Match>,
 }
 
@@ -228,7 +228,7 @@ pub struct PairResult {
 /// ```ts
 /// const { metrics, matches } = analyzePair(
 ///   { fingerprints: [1, 2, 3, 4], ignored: [] },
-///   { fingerprints: [9, 2, 3, 4], ignored: [[3, 4]] },
+///   { fingerprints: [9, 2, 3, 4], ignored: [{ start: 3, end: 4 }] },
 ///   { minMatchLength: 2 },
 /// );
 ///
@@ -253,7 +253,7 @@ fn pair_result(
     options: PairOptions,
 ) -> io::Result<PairResult> {
     let sequences = [left.fingerprints, right.fingerprints];
-    let ignored = to_ranges(vec![left.ignored, right.ignored]);
+    let ignored = [left.ignored, right.ignored];
     let options = AnalysisOptions {
         min_match_length: options.min_match_length,
         keep_matches: true,
@@ -266,54 +266,6 @@ fn pair_result(
         .unwrap_or_default();
 
     Ok(PairResult { metrics: result.metrics()[(0, 1)].clone(), matches })
-}
-
-/// A half-open `[start, end]` interval of ignored positions.
-#[derive(Debug)]
-struct IgnoredInterval(Range<usize>);
-
-/// It deserializes from a list of exactly two positions.
-impl<'de> Deserialize<'de> for IgnoredInterval {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        deserializer.deserialize_seq(IgnoredIntervalVisitor)
-    }
-}
-
-struct IgnoredIntervalVisitor;
-
-impl<'de> Visitor<'de> for IgnoredIntervalVisitor {
-    type Value = IgnoredInterval;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        formatter.write_str("a [start, end] pair")
-    }
-
-    fn visit_seq<A: SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
-        let start = seq
-            .next_element()?
-            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-        let end = seq
-            .next_element()?
-            .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-
-        let mut length = 2;
-        while seq.next_element::<de::IgnoredAny>()?.is_some() {
-            length += 1;
-        }
-        if length != 2 {
-            return Err(de::Error::invalid_length(length, &self));
-        }
-
-        Ok(IgnoredInterval(start..end))
-    }
-}
-
-/// The ignored intervals of every sequence as half-open ranges.
-fn to_ranges(ignored: Vec<Vec<IgnoredInterval>>) -> Vec<Vec<Range<usize>>> {
-    ignored
-        .into_iter()
-        .map(|intervals| intervals.into_iter().map(|interval| interval.0).collect())
-        .collect()
 }
 
 #[cfg(test)]

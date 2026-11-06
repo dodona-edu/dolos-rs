@@ -6,7 +6,7 @@
 
 import assert from "node:assert/strict";
 import {test} from "node:test";
-import {analyze, analyzePair, type PairMetrics,} from "../pkg-node/dolos_core.js";
+import {analyze, analyzePair, type Interval, type PairMetrics,} from "../pkg-node/dolos_core.js";
 
 // One symbol per code unit of `text`.
 const symbols = (text: string): number[] => [...text].map((c) => c.charCodeAt(0));
@@ -36,7 +36,7 @@ test("a pair reports its counts, metrics and matches", () => {
 });
 
 test("an ignored interval splits a match and leaves its position out of the total", () => {
-  const ignored: [number, number][][] = [[[2, 3]], [[2, 3]]];
+  const ignored: Interval[][] = [[{ start: 2, end: 3 }], [{ start: 2, end: 3 }]];
 
   using analysis = analyze([symbols("ABCDE"), symbols("ABCDE")], ignored, {minMatchLength: 1, keepMatches: true});
 
@@ -58,7 +58,6 @@ test("unusable input throws a catchable Error", () => {
   assert.throws(() => analyze([[1], [4294967295]], null, {minMatchLength: 1, keepMatches: true}), /reserved end-of-sequence symbol/);
   assert.throws(() => analyze([[1], [2 ** 32]], null, {minMatchLength: 1, keepMatches: true}), /expected usize/);
   assert.throws(() => analyze([symbols("AB"), symbols("AB")], [], {minMatchLength: 1, keepMatches: true}), /cover 0 sequences/);
-  assert.throws(() => analyze([symbols("AB"), symbols("AB")], [[[2, 1]], []], {minMatchLength: 1, keepMatches: true}), /starts after it ends/);
 
   // The module still works after the rejections, so none of them trapped it.
   using analysis = analyze([symbols("AB"), symbols("AB")], null, {minMatchLength: 1, keepMatches: true});
@@ -72,25 +71,12 @@ test("indices that name no pair throw instead of reaching PairArray", () => {
   assert.throws(() => analysis.metrics(0, 2), /out of range/);
 });
 
-test("an interval that is not a pair of positions throws a catchable Error", () => {
-  const throwsFor = (interval: unknown, message: RegExp) => {
-    const ignored = [[interval], []] as [number, number][][];
-    assert.throws(() => analyze([symbols("AB"), symbols("AB")], ignored, {minMatchLength: 1, keepMatches: true}), message);
-  };
-
-  throwsFor([1], /invalid length 1, expected a \[start, end\] pair/);
-  throwsFor([1, 2, 3], /invalid length 3, expected a \[start, end\] pair/);
-  throwsFor([-1, 2], /expected usize/);
-  throwsFor({ start: 0, end: 1 }, /expected a \[start, end\] pair/);
-});
-
 test("analyzePair returns the metrics and matches of the pair as plain data", () => {
   const result = analyzePair(
     { fingerprints: symbols("ABCDE"), ignored: [] },
-    { fingerprints: symbols("ABCDE"), ignored: [[2, 3]] },
+    { fingerprints: symbols("ABCDE"), ignored: [{ start: 2, end: 3 }] },
     { minMatchLength: 1 },
   );
-  result.matches.sort((a, b) => a.leftStart - b.leftStart);
 
   assert.deepEqual(result, {
     metrics: {
@@ -112,6 +98,6 @@ test("analyzePair rejects unusable input with a catchable Error", () => {
   const ab = { fingerprints: symbols("AB"), ignored: [] };
 
   assert.throws(() => analyzePair(ab, ab, {minMatchLength: 0}), /minimum match length/);
-  assert.throws(() => analyzePair(ab, { fingerprints: symbols("AB"), ignored: [[1, 3]] }, {minMatchLength: 1}), /reaches past its length/);
+  assert.throws(() => analyzePair(ab, { fingerprints: symbols("AB"), ignored: [{ start: 1, end: 3 }] }, {minMatchLength: 1}), /reaches past its length/);
   assert.throws(() => analyzePair(ab, { fingerprints: symbols("AB") } as typeof ab, {minMatchLength: 1}), /missing field `ignored`/);
 });

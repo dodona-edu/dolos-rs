@@ -57,9 +57,8 @@ ignores. The package version follows the crate version.
 ```ts
 import { analyze } from "dolos-core";
 
-// `ignored` holds the positions to leave out, one list of half-open
-// `[start, end]` intervals per sequence, the same shape as the ignored
-// intervals in the CSV report. Pass `null` to ignore nothing.
+// `ignored` holds the positions to leave out, one list of `{ start, end }`
+// intervals per sequence. Pass `null` to ignore nothing.
 using analysis = analyze(fingerprints, ignored, { minMatchLength: 5, keepMatches: true });
 
 const metrics = analysis.metrics(0, 1);
