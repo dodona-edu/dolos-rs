@@ -1,5 +1,6 @@
 use assert_cmd::Command;
 use predicates::prelude::*;
+use rstest::rstest;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
@@ -12,8 +13,13 @@ fn dolos_run(files: &[&str], args: &[&str]) -> Command {
     cmd
 }
 
-/// Run a CSV report into a fresh directory and return that directory.
+/// Run a CSV report of the two fixtures into a fresh directory and return that directory.
 fn csv_report(tmp: &TempDir, extra: &[&str]) -> PathBuf {
+    csv_report_of(tmp, &[SAMPLE1, SAMPLE2], extra)
+}
+
+/// Run a CSV report of `files` into a fresh directory and return that directory.
+fn csv_report_of(tmp: &TempDir, files: &[&str], extra: &[&str]) -> PathBuf {
     let report_dir = tmp.path().join("report");
     #[rustfmt::skip]
     let args = [
@@ -21,7 +27,7 @@ fn csv_report(tmp: &TempDir, extra: &[&str]) -> PathBuf {
         "-n", "report",
         "-o", report_dir.to_str().unwrap(),
     ];
-    dolos_run(&[SAMPLE1, SAMPLE2], &[&args[..], extra].concat())
+    dolos_run(files, &[&args[..], extra].concat())
         .assert()
         .success();
     report_dir
@@ -31,6 +37,21 @@ fn assert_csv_header(path: &Path, expected: &[&str]) {
     assert!(path.exists(), "{} does not exist", path.display());
     let mut reader = csv::Reader::from_path(path).unwrap();
     assert_eq!(reader.headers().unwrap(), expected);
+}
+
+/// The values in the column `name` of a CSV file, without the header.
+fn read_column(path: &Path, name: &str) -> Vec<String> {
+    let mut reader = csv::Reader::from_path(path).unwrap();
+    let index = reader
+        .headers()
+        .unwrap()
+        .iter()
+        .position(|header| header == name);
+    let index = index.unwrap_or_else(|| panic!("{} has no column {name}", path.display()));
+    reader
+        .records()
+        .map(|record| record.unwrap()[index].to_string())
+        .collect()
 }
 
 /// The rows of a CSV file, without the header.
@@ -61,16 +82,77 @@ fn csv_output_writes_the_headers() {
     assert_csv_header(&report_dir.join("metadata.csv"), &["property", "value"]);
     assert_csv_header(
         &report_dir.join("files.csv"),
-        &["id", "path", "content", "fingerprints", "fingerprint_regions", "ignored_intervals"],
+        &["id", "path", "content", "fingerprints", "fingerprintRegions", "ignoredIntervals"],
     );
     assert_csv_header(
         &report_dir.join("pairs.csv"),
-        &["file1_id", "file1_path", "file2_id", "file2_path", "similarity", "longest", "total_left", "total_right", "overlap_left", "overlap_right"],
+        &["id", "leftFileId", "rightFileId", "similarity", "longestFragment", "overlapLeft", "overlapRight", "totalLeft", "totalRight", "totalOverlap"],
     );
     assert_csv_header(
         &report_dir.join("fragments.csv"),
-        &["file1_id", "file1_path", "file1_start_point", "file1_end_point", "file2_id", "file2_path", "file2_start_point", "file2_end_point", "fingerprint_count"],
+        &["leftFileId", "rightFileId", "leftRegion", "rightRegion", "fingerprintCount"],
     );
+}
+
+#[rstest]
+#[case::unsorted(&[])]
+#[case::similarity(&["--sort-by", "similarity"])]
+#[case::total_overlap(&["--sort-by", "total-overlap"])]
+#[case::longest_fragment(&["--sort-by", "longest-fragment"])]
+fn pair_ids_do_not_depend_on_the_sort_order(#[case] sort_by: &[&str]) {
+    let tmp = TempDir::new().unwrap();
+    // A copy of sample2.js makes the pair (1,2) the most similar one.
+    let copy = tmp.path().join("copy.js");
+    std::fs::copy(SAMPLE2, &copy).unwrap();
+    let report_dir = csv_report_of(&tmp, &[SAMPLE1, SAMPLE2, copy.to_str().unwrap()], sort_by);
+
+    let pairs = report_dir.join("pairs.csv");
+    let column = |name: &str| -> Vec<usize> {
+        read_column(&pairs, name)
+            .iter()
+            .map(|cell| cell.parse().unwrap())
+            .collect()
+    };
+    let mut rows: Vec<_> = column("id")
+        .into_iter()
+        .zip(column("leftFileId"))
+        .zip(column("rightFileId"))
+        .map(|((id, left), right)| (id, left, right))
+        .collect();
+    rows.sort();
+    assert_eq!(rows, [(0, 0, 1), (1, 0, 2), (2, 1, 2)]);
+}
+
+#[test]
+fn pairs_csv_holds_the_total_overlap() {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = csv_report(&tmp, &[]);
+
+    let pairs = report_dir.join("pairs.csv");
+    let number = |name: &str| read_column(&pairs, name)[0].parse::<usize>().unwrap();
+    assert_eq!(
+        number("totalOverlap"),
+        number("overlapLeft") + number("overlapRight")
+    );
+}
+
+#[test]
+fn fragments_csv_writes_each_region_as_four_numbers() {
+    let tmp = TempDir::new().unwrap();
+    let report_dir = csv_report(&tmp, &[]);
+
+    let region = |cell: &str| -> Vec<usize> {
+        let numbers = cell.strip_prefix('[').unwrap().strip_suffix(']').unwrap();
+        numbers.split(',').map(|n| n.parse().unwrap()).collect()
+    };
+
+    let rows = read_rows(&report_dir.join("fragments.csv"));
+    assert!(!rows.is_empty());
+    for row in rows {
+        assert_eq!((&row[0], &row[1]), ("0", "1"));
+        assert_eq!(region(&row[2]).len(), 4);
+        assert_eq!(region(&row[3]).len(), 4);
+    }
 }
 
 #[test]

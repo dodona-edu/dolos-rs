@@ -1,4 +1,4 @@
-use dolos::{File, Fragment, Pair, Point, Region};
+use dolos::{File, Fragment, Pair, Region};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::ops::Range;
@@ -22,8 +22,9 @@ impl<'a> MetadataRow<'a> {
 ///
 /// The last three are empty unless `--include-analysis-data` was given:
 /// - `fingerprints`: one hash per fingerprint, `[hash,...]`.
-/// - `fingerprint_regions`: `[start_row,start_col,end_row,end_col]` per fingerprint.
-/// - `ignored_intervals`: one half-open `[start,end)` interval per ignored run.
+/// - `fingerprintRegions`: `[startRow,startCol,endRow,endCol]` per fingerprint.
+/// - `ignoredIntervals`: `[start,end]` per ignored run, a half-open interval of fingerprint
+///   indices.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
     id: usize,
@@ -40,8 +41,8 @@ impl<'a> FileRow<'a> {
         "path",
         "content",
         "fingerprints",
-        "fingerprint_regions",
-        "ignored_intervals",
+        "fingerprintRegions",
+        "ignoredIntervals",
     ];
 
     pub fn new(file: &'a File) -> Self {
@@ -58,94 +59,93 @@ impl<'a> FileRow<'a> {
 }
 
 /// One row of `pairs.csv`.
+///
+/// - `id`: the index of the pair in the order (0,1), (0,2), ..., (1,2), ... of its file ids.
+///   It does not depend on `--sort-by`.
+/// - `leftFileId`, `rightFileId`: the ids of the two files in `files.csv`.
+/// - `similarity`: `totalOverlap` divided by `totalLeft + totalRight`, between 0 and 1.
+/// - `longestFragment`: the length of the longest match, in fingerprints.
+/// - `overlapLeft`, `overlapRight`: the fingerprints of each file that a match covers.
+/// - `totalLeft`, `totalRight`: the fingerprints of each file that are not ignored.
+/// - `totalOverlap`: `overlapLeft + overlapRight`.
 #[derive(Serialize)]
-pub struct PairRow<'a> {
-    file1_id: usize,
-    file1_path: Cow<'a, str>,
-    file2_id: usize,
-    file2_path: Cow<'a, str>,
+pub struct PairRow {
+    id: usize,
+    left_file_id: usize,
+    right_file_id: usize,
     similarity: f64,
-    longest: usize,
-    total_left: usize,
-    total_right: usize,
+    longest_fragment: usize,
     overlap_left: usize,
     overlap_right: usize,
+    total_left: usize,
+    total_right: usize,
+    total_overlap: usize,
 }
 
-impl<'a> PairRow<'a> {
+impl PairRow {
     pub const HEADER: [&'static str; 10] = [
-        "file1_id",
-        "file1_path",
-        "file2_id",
-        "file2_path",
+        "id",
+        "leftFileId",
+        "rightFileId",
         "similarity",
-        "longest",
-        "total_left",
-        "total_right",
-        "overlap_left",
-        "overlap_right",
+        "longestFragment",
+        "overlapLeft",
+        "overlapRight",
+        "totalLeft",
+        "totalRight",
+        "totalOverlap",
     ];
 
-    pub fn new(pair: &'a Pair) -> Self {
+    pub fn new(id: usize, pair: &Pair) -> Self {
+        let metrics = &pair.metrics;
         Self {
-            file1_id: pair.left_file.id,
-            file1_path: pair.left_file.relative_path.to_string_lossy(),
-            file2_id: pair.right_file.id,
-            file2_path: pair.right_file.relative_path.to_string_lossy(),
-            similarity: pair.metrics.similarity,
-            longest: pair.metrics.longest_match,
-            total_left: pair.metrics.total_left,
-            total_right: pair.metrics.total_right,
-            overlap_left: pair.metrics.overlap_left,
-            overlap_right: pair.metrics.overlap_right,
+            id,
+            left_file_id: pair.left_file.id,
+            right_file_id: pair.right_file.id,
+            similarity: metrics.similarity,
+            longest_fragment: metrics.longest_match,
+            overlap_left: metrics.overlap_left,
+            overlap_right: metrics.overlap_right,
+            total_left: metrics.total_left,
+            total_right: metrics.total_right,
+            total_overlap: metrics.overlap_left + metrics.overlap_right,
         }
     }
 }
 
 /// One row of `fragments.csv`: a fragment together with the pair it belongs to.
+///
+/// - `leftFileId`, `rightFileId`: the ids of the two files in `files.csv`.
+/// - `leftRegion`, `rightRegion`: the fragment in each file, as
+///   `[startRow,startCol,endRow,endCol]`.
+/// - `fingerprintCount`: the number of fingerprints in the fragment.
 #[derive(Serialize)]
-pub struct FragmentRow<'a> {
-    file1_id: usize,
-    file1_path: Cow<'a, str>,
-    file1_start_point: String,
-    file1_end_point: String,
-    file2_id: usize,
-    file2_path: Cow<'a, str>,
-    file2_start_point: String,
-    file2_end_point: String,
+pub struct FragmentRow {
+    left_file_id: usize,
+    right_file_id: usize,
+    left_region: String,
+    right_region: String,
     fingerprint_count: usize,
 }
 
-impl<'a> FragmentRow<'a> {
-    pub const HEADER: [&'static str; 9] = [
-        "file1_id",
-        "file1_path",
-        "file1_start_point",
-        "file1_end_point",
-        "file2_id",
-        "file2_path",
-        "file2_start_point",
-        "file2_end_point",
-        "fingerprint_count",
+impl FragmentRow {
+    pub const HEADER: [&'static str; 5] = [
+        "leftFileId",
+        "rightFileId",
+        "leftRegion",
+        "rightRegion",
+        "fingerprintCount",
     ];
 
-    pub fn new(pair: &'a Pair, fragment: &Fragment) -> Self {
+    pub fn new(pair: &Pair, fragment: &Fragment) -> Self {
         Self {
-            file1_id: pair.left_file.id,
-            file1_path: pair.left_file.relative_path.to_string_lossy(),
-            file1_start_point: point(&fragment.left_region.start_point),
-            file1_end_point: point(&fragment.left_region.end_point),
-            file2_id: pair.right_file.id,
-            file2_path: pair.right_file.relative_path.to_string_lossy(),
-            file2_start_point: point(&fragment.right_region.start_point),
-            file2_end_point: point(&fragment.right_region.end_point),
+            left_file_id: pair.left_file.id,
+            right_file_id: pair.right_file.id,
+            left_region: region_to_string(&fragment.left_region),
+            right_region: region_to_string(&fragment.right_region),
             fingerprint_count: fragment.fingerprint_count,
         }
     }
-}
-
-fn point(point: &Point) -> String {
-    format!("{}:{}", point.row, point.column)
 }
 
 fn bracketed<T>(items: &[T], fmt: impl Fn(&T) -> String) -> String {
