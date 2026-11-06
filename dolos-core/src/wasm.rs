@@ -85,8 +85,7 @@ impl Analysis {
     ///
     /// The order of `left` and `right` does not matter. In each match, the left
     /// sequence is always the one with the smaller index. The matches are sorted
-    /// by `leftStart`, then `rightStart`, then `length`. A match that another
-    /// match contains is left out.
+    /// by `leftStart`, then `rightStart`, then `length`.
     ///
     /// @param left - The index of one sequence of the pair.
     /// @param right - The index of the other sequence of the pair.

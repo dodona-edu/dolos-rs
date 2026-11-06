@@ -111,9 +111,8 @@ impl AnalysisResult {
     }
 
     /// Returns the matches of every pair of sequences. The matches of a pair
-    /// are sorted by left start, then right start, then length. A match that
-    /// another match contains is left out. `Some` only when
-    /// [`keep_matches`](crate::AnalysisOptions::keep_matches) is set.
+    /// are sorted by left start, then right start, then length. `Some` only
+    /// when [`keep_matches`](crate::AnalysisOptions::keep_matches) is set.
     ///
     /// # Examples
     ///
