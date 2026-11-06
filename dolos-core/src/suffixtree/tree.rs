@@ -159,19 +159,16 @@ mod tests {
         SuffixTree::build(&sequences).analyze(&sequences, mask, min_match_length, true)
     }
 
-    /// The stored matches of one pair as `(left_start, right_start, length)`,
-    /// sorted so the assertions do not depend on traversal order.
+    /// The stored matches of one pair as `(left_start, right_start, length)`.
     fn matches(result: &AnalysisResult, i: usize, j: usize) -> Vec<(usize, usize, usize)> {
-        let mut found: Vec<(usize, usize, usize)> = result
+        result
             .matches()
             .expect("matches are kept")
             .get(i, j)
             .unwrap()
             .iter()
             .map(|m| (m.left_start, m.right_start, m.length))
-            .collect();
-        found.sort_unstable();
-        found
+            .collect()
     }
 
     #[test]
@@ -396,11 +393,17 @@ mod tests {
     fn core_without_a_node_of_its_own_is_recovered() {
         let result = analyze(&["ABBC", "ABBC"], &["A", "C"], 1);
 
-        assert_eq!(
-            matches(&result, 0, 1),
-            vec![(1, 1, 2), (1, 2, 1), (2, 1, 1)]
-        );
+        assert_eq!(matches(&result, 0, 1), vec![(1, 1, 2)]);
         assert_eq!(result.metrics().get(0, 1).unwrap().longest_match, 2);
+    }
+
+    // `(0, 2, 2)` and `(2, 0, 2)` are maximal on their own diagonal, but
+    // `(0, 0, 4)` contains them on both sides.
+    #[test]
+    fn match_inside_another_match_is_not_reported() {
+        let result = analyze(&["ABAB", "ABAB"], &[], 1);
+
+        assert_eq!(matches(&result, 0, 1), vec![(0, 0, 4)]);
     }
 
     #[test]
