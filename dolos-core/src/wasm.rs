@@ -86,7 +86,7 @@ impl Analysis {
     /// The order of `left` and `right` does not matter. In each match, the left
     /// sequence is always the one with the smaller index. The matches are sorted
     /// by `leftStart`, then `rightStart`, then `length`. A match that another
-    /// match contains is left out, see `analyze`.
+    /// match contains is left out.
     ///
     /// @param left - The index of one sequence of the pair.
     /// @param right - The index of the other sequence of the pair.
@@ -136,10 +136,7 @@ impl Analysis {
 /// The analysis finds the exact matches between every pair of sequences: the
 /// maximal matches, cut at ignored positions. It derives the similarity metrics
 /// of the pair from them. With `keepMatches`, the result also holds the matches
-/// themselves. It leaves out a match when another match of the pair contains it
-/// in both sequences. The cost of that step grows with the number of matches
-/// times the number of matches that overlap in the left sequence, so sequences
-/// that repeat the same symbols many times make it slow.
+/// themselves.
 ///
 /// @param sequences - The sequences to compare. There must be at least two.
 /// Every symbol is a non-negative integer below 4294967295.
