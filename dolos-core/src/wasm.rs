@@ -241,21 +241,11 @@ pub fn analyze_pair(
     right: Ts<PairSequence>,
     options: Ts<PairOptions>,
 ) -> Result<Ts<PairResult>, JsError> {
-    let result = pair_result(left.to_rust()?, right.to_rust()?, options.to_rust()?)?;
-
-    Ok(result.into_ts()?)
-}
-
-/// The metrics and matches of the pair `(left, right)`.
-fn pair_result(
-    left: PairSequence,
-    right: PairSequence,
-    options: PairOptions,
-) -> io::Result<PairResult> {
+    let (left, right) = (left.to_rust()?, right.to_rust()?);
     let sequences = [left.fingerprints, right.fingerprints];
     let ignored = [left.ignored, right.ignored];
     let options = AnalysisOptions {
-        min_match_length: options.min_match_length,
+        min_match_length: options.to_rust()?.min_match_length,
         keep_matches: true,
     };
 
@@ -264,8 +254,9 @@ fn pair_result(
         .matches()
         .map(|matches| matches[(0, 1)].clone())
         .unwrap_or_default();
+    let pair = PairResult { metrics: result.metrics()[(0, 1)].clone(), matches };
 
-    Ok(PairResult { metrics: result.metrics()[(0, 1)].clone(), matches })
+    Ok(pair.into_ts()?)
 }
 
 #[cfg(test)]
