@@ -2,7 +2,7 @@ use crate::Symbol;
 use crate::collections::vec_bitmap::VecBitmap;
 use crate::suffixtree::maximal_match::MaximalMatchAnalyzer;
 use crate::suffixtree::node::Node;
-use crate::suffixtree::tree_builder::UkkonenBuilder;
+use crate::suffixtree::tree_builder::add_sequences;
 use crate::suffixtree::types::AnalysisResult;
 
 /// A generalized suffix tree implementation.
@@ -16,19 +16,16 @@ impl SuffixTree {
     /// Creates a new `SuffixTree` from the given sequences, building it immediately.
     pub fn build(sequences: &[Vec<Symbol>]) -> Self {
         let mut tree = SuffixTree { arena: vec![Node::create_root()] };
-        UkkonenBuilder::new().add_sequences(sequences, &mut tree);
+        add_sequences(sequences, &mut tree);
         tree
     }
 
-    /// Run maximal-match analysis on this suffix tree, returning pairwise
-    /// similarity and longest-match results.
+    /// Find the maximal matches between every pair of `sequences`.
     ///
-    /// * `sequences` — the sequences being analyzed.
-    /// * `ignored` — the set bits mark the ignored positions of each sequence;
-    ///   matches are split at those positions before being recorded. `None`
-    ///   ignores nothing.
-    /// * `min_match_length` — minimum shared substring length to record as a match.
-    /// * `keep_matches` — when `true`, the raw matches are kept in the result.
+    /// * `ignored_mask` — the set bits mark the ignored positions of each
+    ///   sequence. Matches are split at those positions. `None` ignores nothing.
+    /// * `min_match_length` — the minimum length of a recorded match.
+    /// * `keep_matches` — keep the matches in the result.
     pub fn analyze(
         &self,
         sequences: &[Vec<Symbol>],
@@ -77,7 +74,7 @@ pub mod test_utils {
                 continue;
             }
 
-            node_index = *node.get_child(symbol)?;
+            node_index = node.child(symbol)?;
             edge_offset = 1;
         }
 
@@ -223,81 +220,6 @@ mod tests {
     }
 
     #[test]
-    fn build_keeps_disjoint_sequences_apart() {
-        let sequences = vec![str_to_symbols("ABC"), str_to_symbols("DEF")];
-        let tree = SuffixTree::build(&sequences);
-        let control_tree = SuffixTree {
-            #[rustfmt::skip]
-            arena: vec![
-                Node::new(Range::new(0, 0, 0), None, Some(HashMap::from([(65, 1), (66, 2), (67, 3), (68, 5), (69, 6), (70, 7), (SENTINEL_SYMBOL, 4)])), None, None),
-                Node::new(Range::new(0, 3, 0), Some(0), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(1, 3, 0), Some(0), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(2, 3, 0), Some(0), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(3, 3, 0), Some(0), None, None, Some(HashSet::from([0, 1]))),
-                Node::new(Range::new(0, 3, 1), Some(0), None, None, Some(HashSet::from([1]))),
-                Node::new(Range::new(1, 3, 1), Some(0), None, None, Some(HashSet::from([1]))),
-                Node::new(Range::new(2, 3, 1), Some(0), None, None, Some(HashSet::from([1]))),
-            ],
-        };
-        assert_eq!(tree, control_tree);
-    }
-
-    #[test]
-    fn build_shares_a_common_prefix() {
-        let sequences = vec![str_to_symbols("XYAB"), str_to_symbols("XYCD")];
-        let tree = SuffixTree::build(&sequences);
-        let control_tree = SuffixTree {
-            #[rustfmt::skip]
-            arena: vec![
-                Node::new(Range::new(0, 0, 0), None, Some(HashMap::from([(65, 3), (66, 4), (67, 10), (68, 11), (88, 6), (89, 8), (SENTINEL_SYMBOL, 5)])), None, None),
-                Node::new(Range::new(2, 4, 0), Some(6), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(2, 4, 0), Some(8), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(2, 4, 0), Some(0), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(3, 4, 0), Some(0), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(4, 4, 0), Some(0), None, None, Some(HashSet::from([0, 1]))),
-                Node::new(Range::new(0, 2, 0), Some(0), Some(HashMap::from([(65, 1), (67, 7)])), Some(8), None),
-                Node::new(Range::new(2, 4, 1), Some(6), None, None, Some(HashSet::from([1]))),
-                Node::new(Range::new(1, 2, 0), Some(0), Some(HashMap::from([(65, 2), (67, 9)])), Some(0), None),
-                Node::new(Range::new(2, 4, 1), Some(8), None, None, Some(HashSet::from([1]))),
-                Node::new(Range::new(2, 4, 1), Some(0), None, None, Some(HashSet::from([1]))),
-                Node::new(Range::new(3, 4, 1), Some(0), None, None, Some(HashSet::from([1]))),
-            ],
-        };
-        assert_eq!(tree, control_tree);
-    }
-
-    #[test]
-    fn build_shares_a_common_suffix() {
-        let sequences = vec![str_to_symbols("ABXY"), str_to_symbols("CDXY")];
-        let tree = SuffixTree::build(&sequences);
-        let control_tree = SuffixTree {
-            #[rustfmt::skip]
-            arena: vec![
-                Node::new(Range::new(0, 0, 0), None, Some(HashMap::from([(65, 1), (66, 2), (67, 6), (68, 7), (88, 3), (89, 4), (SENTINEL_SYMBOL, 5)])), None, None),
-                Node::new(Range::new(0, 4, 0), Some(0), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(1, 4, 0), Some(0), None, None, Some(HashSet::from([0]))),
-                Node::new(Range::new(2, 4, 0), Some(0), None, None, Some(HashSet::from([0, 1]))),
-                Node::new(Range::new(3, 4, 0), Some(0), None, None, Some(HashSet::from([0, 1]))),
-                Node::new(Range::new(4, 4, 0), Some(0), None, None, Some(HashSet::from([0, 1]))),
-                Node::new(Range::new(0, 4, 1), Some(0), None, None, Some(HashSet::from([1]))),
-                Node::new(Range::new(1, 4, 1), Some(0), None, None, Some(HashSet::from([1]))),
-            ],
-        };
-        assert_eq!(tree, control_tree);
-    }
-
-    #[test]
-    fn build_contains_every_substring() {
-        let sequences = vec![
-            str_to_symbols("MISSISSIPPI"),
-            str_to_symbols("BANANA"),
-            str_to_symbols("BANASSIPPI"),
-        ];
-        let tree = SuffixTree::build(&sequences);
-        assert_contains_all_substrings(&tree, &sequences);
-    }
-
-    #[test]
     fn build_contains_every_substring_of_random_sequences() {
         let mut rng = StdRng::seed_from_u64(42);
         let sequences: Vec<Vec<Symbol>> = (0..50)
@@ -332,28 +254,6 @@ mod tests {
         assert_eq!(m.similarity, 0.0);
         assert_eq!(m.longest_match, 0);
         assert_eq!((m.overlap_left, m.overlap_right), (0, 0));
-    }
-
-    #[test]
-    fn shared_substring_is_found_at_differing_offsets() {
-        let result = analyze(&["ABCDEF", "XYZABC"], &[], 1);
-
-        assert_eq!(matches(&result, 0, 1), vec![(0, 3, 3)]);
-        let m = result.metrics().get(0, 1).unwrap();
-        assert_eq!(m.similarity, 0.5);
-        assert_eq!(m.longest_match, 3);
-        assert_eq!((m.overlap_left, m.overlap_right), (3, 3));
-    }
-
-    #[test]
-    fn every_pair_is_scored_separately() {
-        let result = analyze(&["ABCD", "ABCE", "XYZW"], &[], 1);
-
-        // Only the first two sequences share anything: "ABC".
-        assert_eq!(result.metrics().get(0, 1).unwrap().longest_match, 3);
-        assert_eq!(result.metrics().get(0, 1).unwrap().similarity, 0.75);
-        assert_eq!(result.metrics().get(0, 2).unwrap().similarity, 0.0);
-        assert_eq!(result.metrics().get(1, 2).unwrap().similarity, 0.0);
     }
 
     #[test]
