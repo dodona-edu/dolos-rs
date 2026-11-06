@@ -1,5 +1,5 @@
 use crate::config::FragmentSortBy;
-use crate::winnowing::region::{Point, Region};
+use crate::winnowing::region::Region;
 use dolos_core::{Match, PairArray};
 use std::cmp::Reverse;
 
@@ -55,33 +55,34 @@ pub fn resolve_fragments(
 
 /// Sort fragments in-place according to `sort_by`.
 ///
-/// `FileOrder` and `None` both sort by the position. The other orders break
-/// ties on the position.
+/// `FileOrder` and `None` sort by the start in the left file, then in the right
+/// file. The other orders break ties in the same way.
 fn sort_fragments(fragments: &mut [Fragment], sort_by: &Option<FragmentSortBy>) {
     match sort_by {
-        Some(FragmentSortBy::KgramsAscending) => {
-            fragments.sort_by_key(|f| (f.fingerprint_count, position(f)));
-        }
-        Some(FragmentSortBy::KgramsDescending) => {
-            fragments.sort_by_key(|f| (Reverse(f.fingerprint_count), position(f)));
-        }
+        Some(FragmentSortBy::KgramsAscending) => fragments.sort_by_key(|f| {
+            (
+                f.fingerprint_count,
+                f.left_region.start_point,
+                f.right_region.start_point,
+            )
+        }),
+        Some(FragmentSortBy::KgramsDescending) => fragments.sort_by_key(|f| {
+            (
+                Reverse(f.fingerprint_count),
+                f.left_region.start_point,
+                f.right_region.start_point,
+            )
+        }),
         Some(FragmentSortBy::FileOrder) | None => {
-            fragments.sort_by_key(position);
+            fragments.sort_by_key(|f| (f.left_region.start_point, f.right_region.start_point))
         }
     }
-}
-
-/// The start of the fragment in the left file, then in the right file.
-fn position(fragment: &Fragment) -> (Point, Point) {
-    (
-        fragment.left_region.start_point,
-        fragment.right_region.start_point,
-    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::winnowing::region::Point;
     use dolos_core::{AnalysisOptions, AnalysisResult};
     use rstest::rstest;
 
