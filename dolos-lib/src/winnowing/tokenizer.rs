@@ -12,51 +12,48 @@ pub struct Token {
     pub location: Region,
 }
 
-/// The tokenizer of one language: a tree-sitter parser, or the character tokenizer of
-/// [`Language::Char`].
+/// The tokenizer of one language.
 pub enum Tokenizer {
-    TreeSitter(Parser),
+    /// A tree-sitter parser.
+    Code { parser: Parser, include_comments: bool },
+    /// One token per character, for plain text.
     Char,
 }
 
 impl Tokenizer {
-    pub fn new(language: Language) -> Self {
+    /// The tokenizer of `language`. `include_comments` keeps the comment nodes of
+    /// a tree-sitter language.
+    pub fn new(language: Language, include_comments: bool) -> Self {
         let Some(grammar) = language.tree_sitter_language() else {
             return Tokenizer::Char;
         };
         let mut parser = Parser::new();
         parser.set_language(&grammar.into()).expect("set language");
-        Tokenizer::TreeSitter(parser)
+        Tokenizer::Code { parser, include_comments }
     }
 
-    /// Tokenize `content`. `include_comments` has no effect on [`Tokenizer::Char`].
-    pub fn tokenize(&mut self, content: &str, include_comments: bool) -> Vec<Token> {
+    pub fn tokenize(&mut self, content: &str) -> Vec<Token> {
         match self {
-            Tokenizer::TreeSitter(parser) => parser
+            Tokenizer::Code { parser, include_comments } => parser
                 .parse(content, None)
                 .expect("tree")
-                .tokens(include_comments),
+                .tokens(*include_comments),
             Tokenizer::Char => char_tokens(content),
         }
     }
 }
 
-/// Split `content` on `\n` and make one token for each character of each line.
-/// The region of a token covers the bytes of its character.
+/// One token per character. Line endings are not tokens.
 fn char_tokens(content: &str) -> Vec<Token> {
-    content
-        .split('\n')
-        .enumerate()
-        .flat_map(|(row, line)| {
-            line.char_indices().map(move |(column, c)| Token {
-                name: c.to_string(),
-                location: Region::new(
-                    Point::new(row, column),
-                    Point::new(row, column + c.len_utf8()),
-                ),
-            })
-        })
-        .collect()
+    let mut tokens = Vec::new();
+    for (row, line) in content.lines().enumerate() {
+        for (column, c) in line.char_indices() {
+            let start = Point::new(row, column);
+            let end = Point::new(row, column + c.len_utf8());
+            tokens.push(Token { name: c.to_string(), location: Region::new(start, end) });
+        }
+    }
+    tokens
 }
 
 fn recursive_add<'a: 'b, 'b>(
@@ -124,8 +121,8 @@ mod tests {
 
     #[test]
     fn tokens_wrap_every_named_node_in_brackets() {
-        let mut tokenizer = Tokenizer::new(Language::Javascript);
-        let actual = tokenizer.tokenize("1", false);
+        let mut tokenizer = Tokenizer::new(Language::Javascript, false);
+        let actual = tokenizer.tokenize("1");
 
         let r00 = Region::new(Point::new(0, 0), Point::new(0, 0));
         let r01 = Region::new(Point::new(0, 0), Point::new(0, 1));
@@ -149,20 +146,19 @@ mod tests {
 
     #[test]
     fn char_tokens_cover_one_character_each() {
-        let mut tokenizer = Tokenizer::new(Language::Char);
-        let actual = tokenizer.tokenize("é a\n\nb\r", false);
+        let mut tokenizer = Tokenizer::new(Language::Char, false);
+        let actual = tokenizer.tokenize("é a\r\n\r\nb\n");
 
         let token = |name: &str, row, start, end| Token {
             name: name.to_string(),
             location: Region::new(Point::new(row, start), Point::new(row, end)),
         };
-        // `é` is two bytes. The empty line gives no tokens. `\r` is a token.
+        // `é` is two bytes. The empty line and the line endings give no tokens.
         let expected = vec![
             token("é", 0, 0, 2),
             token(" ", 0, 2, 3),
             token("a", 0, 3, 4),
             token("b", 2, 0, 1),
-            token("\r", 2, 1, 2),
         ];
 
         assert_eq!(actual, expected);
@@ -172,9 +168,9 @@ mod tests {
     fn token_locations_advance_through_the_file() {
         // region_from_kgram takes the start of the first token of a kgram and
         // the end of the last one, which needs a stream in source order.
-        let mut tokenizer = Tokenizer::new(Language::Javascript);
+        let mut tokenizer = Tokenizer::new(Language::Javascript, false);
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
-        let tokens = tokenizer.tokenize(&content, false);
+        let tokens = tokenizer.tokenize(&content);
 
         for pair in tokens.windows(2) {
             assert!(
@@ -192,9 +188,9 @@ mod tests {
         let expected: Vec<Token> =
             serde_json::from_str(&std::fs::read_to_string("fixtures/sample.tokens.json").unwrap())
                 .unwrap();
-        let mut tokenizer = Tokenizer::new(Language::Javascript);
+        let mut tokenizer = Tokenizer::new(Language::Javascript, false);
         let content = std::fs::read_to_string(Path::new("fixtures/sample1.js")).unwrap();
-        let actual = tokenizer.tokenize(&content, false);
+        let actual = tokenizer.tokenize(&content);
         assert_eq!(actual, expected);
     }
 
@@ -206,9 +202,9 @@ mod tests {
             serde_json::to_writer(std::fs::File::create(path).unwrap(), value).unwrap();
         }
 
-        let mut tokenizer = Tokenizer::new(Language::Javascript);
+        let mut tokenizer = Tokenizer::new(Language::Javascript, false);
         let content = std::fs::read_to_string("fixtures/sample1.js").unwrap();
-        let tokens = tokenizer.tokenize(&content, false);
+        let tokens = tokenizer.tokenize(&content);
 
         write("fixtures/sample.tokens.json", &tokens);
 

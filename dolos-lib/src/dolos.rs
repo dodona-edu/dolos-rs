@@ -111,7 +111,7 @@ impl Dolos {
         let metadata = Metadata::from_config(&config, &dataset);
         let template = Template::create(config.template, metadata.language)?;
 
-        let tokenizer = Tokenizer::new(metadata.language);
+        let tokenizer = Tokenizer::new(metadata.language, metadata.include_comments);
 
         let locations = if metadata.include_fragments || metadata.include_analysis_data {
             Some(Vec::new())
@@ -142,13 +142,11 @@ impl Dolos {
         content: &str,
         keep_locations: bool,
     ) -> (Vec<Fingerprint>, Option<Vec<Region>>) {
-        self.tokenizer
-            .tokenize(content, self.metadata.include_comments)
-            .winnow(
-                self.metadata.kgram_length,
-                self.metadata.kgrams_in_window,
-                keep_locations,
-            )
+        self.tokenizer.tokenize(content).winnow(
+            self.metadata.kgram_length,
+            self.metadata.kgrams_in_window,
+            keep_locations,
+        )
     }
 
     /// Tokenize the files of `file_set` and register them as the files of the analysis.
