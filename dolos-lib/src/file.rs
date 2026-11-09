@@ -5,8 +5,19 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::{Error, ErrorKind, Result};
 use std::ops::Range;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tree_sitter_grammars::Language;
+
+/// Read the text file at `path`.
+///
+/// # Errors
+/// Fails when the file cannot be read, or with [`ErrorKind::InvalidData`] when it is not UTF-8 text.
+pub(crate) fn read_text(path: &Path) -> Result<String> {
+    std::fs::read_to_string(path).map_err(|e| match e.kind() {
+        ErrorKind::InvalidData => Error::new(ErrorKind::InvalidData, "the file is not UTF-8 text"),
+        _ => e,
+    })
+}
 
 /// One input file of an analysis.
 #[derive(Clone)]

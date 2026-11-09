@@ -1,12 +1,9 @@
-use crate::file::{File, FileSet};
+use crate::file::{File, FileSet, read_text};
 use std::io::{Error, ErrorKind, Result};
 use std::path::PathBuf;
 use tree_sitter_grammars::Language;
 
-use super::{Input, resolve};
-
-/// The number of skipped paths that a warning names.
-const SHOWN_PATHS: usize = 3;
+use super::{Input, list_paths, resolve};
 
 /// A named collection of read source files in one language, ready for analysis.
 pub struct Dataset {
@@ -71,31 +68,17 @@ impl Dataset {
 fn read_files(file_set: &FileSet) -> Vec<File> {
     let mut files = Vec::new();
     for relative_path in &file_set.relative_paths {
-        let path = file_set.base_dir.join(relative_path);
-        match std::fs::read_to_string(&path) {
+        match read_text(&file_set.base_dir.join(relative_path)) {
             Ok(content) => files.push(File {
                 id: files.len(),
                 relative_path: relative_path.clone(),
                 content,
                 analysis_data: None,
             }),
-            Err(e) => log::warn!("skipped '{}': {e}", path.display()),
+            Err(e) => log::warn!("skipped '{}': {e}", relative_path.display()),
         }
     }
     files
-}
-
-/// List the first [`SHOWN_PATHS`] paths, such as `a.md, b.txt, c.csv and 2 more`.
-fn list_paths(paths: &[PathBuf]) -> String {
-    let shown: Vec<String> = paths
-        .iter()
-        .take(SHOWN_PATHS)
-        .map(|path| path.display().to_string())
-        .collect();
-    match paths.len().saturating_sub(SHOWN_PATHS) {
-        0 => shown.join(", "),
-        more => format!("{} and {more} more", shown.join(", ")),
-    }
 }
 
 #[cfg(test)]
@@ -218,13 +201,5 @@ mod tests {
         let mut files = relative_paths(&dataset);
         files.sort();
         assert_eq!(files, vec![PathBuf::from("a.js"), PathBuf::from("b.js")]);
-    }
-
-    #[rstest]
-    #[case::few(&["a.md", "b.txt"], "a.md, b.txt")]
-    #[case::many(&["a.md", "b.txt", "c.csv", "d", "e"], "a.md, b.txt, c.csv and 2 more")]
-    fn list_paths_names_the_first_paths(#[case] paths: &[&str], #[case] expected: &str) {
-        let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
-        assert_eq!(list_paths(&paths), expected);
     }
 }

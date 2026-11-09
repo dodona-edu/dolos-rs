@@ -338,9 +338,5 @@ fn unreadable_files_are_skipped_with_a_warning() {
     dolos_run(&[tmp.path().to_str().unwrap()], &["-q"])
         .assert()
         .success()
-        .stderr(
-            predicate::str::contains("warning: skipped '").and(predicate::str::contains(
-                "c.js': stream did not contain valid UTF-8",
-            )),
-        );
+        .stderr("warning: skipped 'c.js': the file is not UTF-8 text\n");
 }

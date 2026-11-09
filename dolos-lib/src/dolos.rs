@@ -1,6 +1,5 @@
 use crate::config::DolosConfig;
-use crate::error::context;
-use crate::file::{AnalysisData, File, FileSet};
+use crate::file::{AnalysisData, File};
 use crate::fragment::resolve_fragments;
 use crate::ignore;
 use crate::metadata::Metadata;
@@ -12,7 +11,7 @@ use crate::winnowing::tokenizer::Tokenizer;
 use std::fmt;
 use std::io::Result;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 
 /// A plagiarism analysis over a set of source files.
@@ -139,13 +138,14 @@ impl Dolos {
             dolos.add_file(file);
         }
 
-        if !template.file_set.relative_paths.is_empty() {
-            log::info!(
-                step = "template";
-                "fingerprinting the template ({} files)",
-                template.file_set.relative_paths.len()
-            );
-            dolos.add_template(&template.file_set)?;
+        match template.contents.len() {
+            0 => {}
+            1 => log::info!(step = "template"; "fingerprinting 1 template file"),
+            count => log::info!(step = "template"; "fingerprinting {count} template files"),
+        }
+        for content in &template.contents {
+            let (fingerprints, _) = dolos.fingerprint(content, false);
+            dolos.template_fingerprints.push(fingerprints);
         }
 
         Ok(dolos)
@@ -178,20 +178,6 @@ impl Dolos {
             locs.push(locations.expect("locations should be present when they are kept"));
         }
         self.files.push(file);
-    }
-
-    /// Tokenize the template files and append their fingerprints to
-    /// `self.template_fingerprints`.
-    ///
-    /// Template files are never added to `self.files` or `self.locations`: they
-    /// do not appear in the report, and no fragment resolution is needed for them.
-    fn add_template(&mut self, file_set: &FileSet) -> Result<()> {
-        for relative in &file_set.relative_paths {
-            let content = read_file(&file_set.base_dir, relative)?;
-            let (fingerprints, _) = self.fingerprint(&content, false);
-            self.template_fingerprints.push(fingerprints);
-        }
-        Ok(())
     }
 
     /// Fill in the analysis data of every file.
@@ -277,13 +263,6 @@ impl Dolos {
         let files = self.files.into_iter().map(Rc::new).collect();
         Report::new(result.metrics(), fragments, files, self.metadata)
     }
-}
-
-/// Read the file at `relative` in `base_dir`.
-fn read_file(base_dir: &Path, relative: &Path) -> Result<String> {
-    let path = base_dir.join(relative);
-    std::fs::read_to_string(&path)
-        .map_err(|e| context(e, format!("could not read '{}'", path.display())))
 }
 
 impl fmt::Debug for Dolos {
