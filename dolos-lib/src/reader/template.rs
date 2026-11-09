@@ -1,3 +1,4 @@
+use crate::error::context;
 use crate::file::{FileSet, language_name};
 use std::io::{Error, ErrorKind, Result};
 use std::path::PathBuf;
@@ -27,8 +28,8 @@ impl Template {
             });
         }
 
-        let Input { mut file_set, temp_dir, .. } = Input::read(paths)
-            .map_err(|e| Error::new(e.kind(), format!("could not read the template: {e}")))?;
+        let Input { mut file_set, temp_dir, .. } =
+            Input::read(paths).map_err(|e| context(e, "could not read the template"))?;
 
         file_set.retain_language(language);
         if file_set.relative_paths.is_empty() {

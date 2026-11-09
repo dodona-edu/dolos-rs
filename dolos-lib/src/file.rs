@@ -137,10 +137,11 @@ impl FileSet {
             [language] => Ok(language),
             _ => {
                 let names: Vec<String> = winners.into_iter().map(language_name).collect();
+                let files = if max == 1 { "file" } else { "files" };
                 Err(Error::new(
                     ErrorKind::InvalidInput,
                     format!(
-                        "could not detect the language: {} each match {max} files; specify the language",
+                        "could not detect the language: {} each match {max} {files}; specify the language",
                         names.join(" and ")
                     ),
                 ))
