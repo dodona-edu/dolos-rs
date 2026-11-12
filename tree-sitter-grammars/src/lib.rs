@@ -91,7 +91,7 @@ pub enum Language {
 
 /// The names, file extensions and tree-sitter grammar of one language.
 struct Grammar {
-    /// Lowercase names and aliases, such as `"golang"`. The first entry is the name.
+    /// First the name, then its aliases, such as `"golang"`.
     names: &'static [&'static str],
     /// Lowercase file extensions, without the dot.
     extensions: &'static [&'static str],
@@ -199,7 +199,7 @@ impl Language {
             .find(|language| contains_ignoring_case(language.grammar().names, name))
     }
 
-    /// Return the lowercase name of this language, such as `"javascript"`.
+    /// Return the name of this language, such as `"javascript"`.
     ///
     /// # Examples
     ///
