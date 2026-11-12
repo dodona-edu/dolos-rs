@@ -5,8 +5,19 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::{Error, ErrorKind, Result};
 use std::ops::Range;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tree_sitter_grammars::Language;
+
+/// Read the text file at `path`.
+///
+/// # Errors
+/// Fails when the file cannot be read, or with [`ErrorKind::InvalidData`] when it is not UTF-8 text.
+pub(crate) fn read_text(path: &Path) -> Result<String> {
+    std::fs::read_to_string(path).map_err(|e| match e.kind() {
+        ErrorKind::InvalidData => Error::new(ErrorKind::InvalidData, "the file is not UTF-8 text"),
+        _ => e,
+    })
+}
 
 /// One input file of an analysis.
 #[derive(Clone)]
@@ -144,9 +155,13 @@ impl FileSet {
         }
     }
 
-    /// Keep only the files whose extension belongs to `language`.
-    pub fn retain_language(&mut self, language: Language) {
-        self.relative_paths.retain(|path| language.matches(path));
+    /// Keep only the files whose extension belongs to `language`, and return the other files.
+    pub fn retain_language(&mut self, language: Language) -> Vec<PathBuf> {
+        let (kept, skipped) = std::mem::take(&mut self.relative_paths)
+            .into_iter()
+            .partition(|path| language.matches(path));
+        self.relative_paths = kept;
+        skipped
     }
 }
 
@@ -192,10 +207,18 @@ mod tests {
     #[test]
     fn retain_language_keeps_matching_files() {
         let mut files = file_set(&["a.cpp", "README.md", "b.h", ".gitignore", "Makefile"]);
-        files.retain_language(Language::Cpp);
+        let skipped = files.retain_language(Language::Cpp);
         assert_eq!(
             files.relative_paths,
             [PathBuf::from("a.cpp"), PathBuf::from("b.h")]
+        );
+        assert_eq!(
+            skipped,
+            [
+                PathBuf::from("README.md"),
+                PathBuf::from(".gitignore"),
+                PathBuf::from("Makefile")
+            ]
         );
     }
 }
