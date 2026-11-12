@@ -175,7 +175,7 @@ mod tests {
         let err = file_set(&["a.h", "b.h", "c.h", "README.md"])
             .detect_language()
             .unwrap_err();
-        assert!(err.to_string().contains("c and c++ each match"), "{err}");
+        assert!(err.to_string().contains("C and C++ each match"), "{err}");
     }
 
     #[test]

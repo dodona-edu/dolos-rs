@@ -284,5 +284,5 @@ fn library_errors_print_only_the_message() {
     dolos_run(&[SAMPLE1, SAMPLE2], &["-l", "python"])
         .assert()
         .code(1)
-        .stderr("error: need at least 2 python files to compare\n");
+        .stderr("error: need at least 2 Python files to compare\n");
 }
