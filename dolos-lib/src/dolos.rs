@@ -104,15 +104,7 @@ impl Dolos {
     /// # fn main() {}
     /// ```
     pub fn new(files: Vec<PathBuf>, config: DolosConfig) -> Result<Self> {
-        let dataset = Dataset::create(files, config.language)?;
-        if config.max_fingerprint_percentage.is_some() && dataset.files.len() < 3 {
-            tracing::warn!(
-                "the maximum fingerprint percentage has no use with fewer than 3 files; \
-                 it ignores every shared fingerprint or none"
-            );
-        }
-        let metadata = Metadata::from_config(&config, &dataset);
-        let template = Template::create(config.template, metadata.language)?;
+        let (dataset, metadata, template) = read_input(files, config)?;
 
         let tokenizer = Tokenizer::new(metadata.language, metadata.include_comments);
 
@@ -128,13 +120,28 @@ impl Dolos {
             tokenizer,
         };
 
-        for file in dataset.files {
-            dolos.add_file(file);
-        }
+        let description = format!(
+            "fingerprinting {} {} files",
+            dataset.files.len(),
+            dataset.language.name()
+        );
+        tracing::info_span!("fingerprint", %description).in_scope(|| {
+            for file in dataset.files {
+                dolos.add_file(file);
+            }
+        });
 
-        for content in &template.contents {
-            let (fingerprints, _) = dolos.fingerprint(content, false);
-            dolos.template_fingerprints.push(fingerprints);
+        if !template.contents.is_empty() {
+            let description = match template.contents.len() {
+                1 => "fingerprinting 1 template file".to_string(),
+                count => format!("fingerprinting {count} template files"),
+            };
+            tracing::info_span!("template", %description).in_scope(|| {
+                for content in &template.contents {
+                    let (fingerprints, _) = dolos.fingerprint(content, false);
+                    dolos.template_fingerprints.push(fingerprints);
+                }
+            });
         }
 
         Ok(dolos)
@@ -217,6 +224,12 @@ impl Dolos {
     /// # fn main() {}
     /// ```
     pub fn build_report(mut self) -> Report {
+        let file_count = self.files.len();
+        let description = match file_count * (file_count - 1) / 2 {
+            1 => "comparing 1 pair".to_string(),
+            pairs => format!("comparing {pairs} pairs"),
+        };
+        let _step = tracing::info_span!("compare", %description).entered();
         let ignored = ignore::classify(
             &self.fingerprints,
             &self.template_fingerprints,
@@ -246,6 +259,36 @@ impl Dolos {
 
         let files = self.files.into_iter().map(Rc::new).collect();
         Report::new(result.metrics(), fragments, files, self.metadata)
+    }
+}
+
+/// Read the input files and the template in the read step, and return them with
+/// the metadata of the analysis.
+fn read_input(files: Vec<PathBuf>, config: DolosConfig) -> Result<(Dataset, Metadata, Template)> {
+    let description = read_description(&files);
+    let span = tracing::info_span!("read", %description, error = tracing::field::Empty);
+    span.in_scope(|| {
+        let dataset = Dataset::create(files, config.language)?;
+        if config.max_fingerprint_percentage.is_some() && dataset.files.len() < 3 {
+            tracing::warn!(
+                "the maximum fingerprint percentage has no use with fewer than 3 files; \
+                 it ignores every shared fingerprint or none"
+            );
+        }
+        let metadata = Metadata::from_config(&config, &dataset);
+        let template = Template::create(config.template, metadata.language)?;
+        Ok((dataset, metadata, template))
+    })
+    .inspect_err(|e| {
+        span.record("error", tracing::field::display(e));
+    })
+}
+
+/// Describe the read step, such as `reading 'submissions.zip'` or `reading 3 files`.
+fn read_description(files: &[PathBuf]) -> String {
+    match files {
+        [path] => format!("reading '{}'", path.display()),
+        _ => format!("reading {} files", files.len()),
     }
 }
 
