@@ -8,11 +8,6 @@ use std::ops::Range;
 use std::path::PathBuf;
 use tree_sitter_grammars::Language;
 
-/// The lowercase name of `language` for messages, such as `javascript`.
-pub(crate) fn language_name(language: Language) -> String {
-    format!("{language:?}").to_lowercase()
-}
-
 /// One input file of an analysis.
 #[derive(Clone)]
 pub struct File {
@@ -136,7 +131,7 @@ impl FileSet {
         match winners[..] {
             [language] => Ok(language),
             _ => {
-                let names: Vec<String> = winners.into_iter().map(language_name).collect();
+                let names: Vec<&str> = winners.into_iter().map(Language::name).collect();
                 let files = if max == 1 { "file" } else { "files" };
                 Err(Error::new(
                     ErrorKind::InvalidInput,
@@ -180,7 +175,7 @@ mod tests {
         let err = file_set(&["a.h", "b.h", "c.h", "README.md"])
             .detect_language()
             .unwrap_err();
-        assert!(err.to_string().contains("c and cpp each match"), "{err}");
+        assert!(err.to_string().contains("c and c++ each match"), "{err}");
     }
 
     #[test]

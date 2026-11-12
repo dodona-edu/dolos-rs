@@ -1,5 +1,5 @@
 use crate::error::context;
-use crate::file::{FileSet, language_name};
+use crate::file::FileSet;
 use std::io::{Error, ErrorKind, Result};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -35,7 +35,7 @@ impl Template {
         if file_set.relative_paths.is_empty() {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
-                format!("the template has no {} files", language_name(language)),
+                format!("the template has no {} files", language.name()),
             ));
         }
 

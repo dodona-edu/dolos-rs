@@ -91,7 +91,7 @@ pub enum Language {
 
 /// The names, file extensions and tree-sitter grammar of one language.
 struct Grammar {
-    /// Lowercase names and aliases, such as `"golang"`.
+    /// Lowercase names and aliases, such as `"golang"`. The first entry is the name.
     names: &'static [&'static str],
     /// Lowercase file extensions, without the dot.
     extensions: &'static [&'static str],
@@ -197,6 +197,22 @@ impl Language {
             .iter()
             .copied()
             .find(|language| contains_ignoring_case(language.grammar().names, name))
+    }
+
+    /// Return the lowercase name of this language, such as `"javascript"`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # #[cfg(feature = "lang-go")] {
+    /// use tree_sitter_grammars::Language;
+    ///
+    /// assert_eq!(Language::Go.name(), "go");
+    /// assert_eq!(Language::from_name("golang").map(Language::name), Some("go"));
+    /// # }
+    /// ```
+    pub fn name(self) -> &'static str {
+        self.grammar().names[0]
     }
 
     /// Return the languages that use the extension of `path`, ignoring case.
