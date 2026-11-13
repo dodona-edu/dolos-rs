@@ -41,6 +41,9 @@ impl Dolos {
     ///     column instead.
     ///   - **One CSV file**: the files listed in its `filename` column,
     ///     relative to the directory of the CSV file.
+    ///
+    ///   The other columns of the CSV file that are read fill the
+    ///   [`FileInfo`](crate::FileInfo) of each file.
     ///   - **One archive** (`.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`,
     ///     `.tbz`, `.tbz2`): extracted, then read as a directory.
     /// - `config`: the analysis configuration. See [`DolosConfig::builder`].
@@ -164,6 +167,7 @@ impl Dolos {
                 id: self.files.len(),
                 relative_path: relative.clone(),
                 content,
+                info: file_set.info.get(relative).cloned().unwrap_or_default(),
                 analysis_data: None,
             });
         }

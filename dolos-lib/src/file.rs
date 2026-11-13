@@ -1,5 +1,6 @@
 use crate::winnowing::fingerprints::Fingerprint;
 use crate::winnowing::region::Region;
+use chrono::{DateTime, FixedOffset};
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
@@ -21,10 +22,28 @@ pub struct File {
     pub relative_path: PathBuf,
     /// Full source text of the file.
     pub content: String,
+    /// The data of the `info.csv` row of the file.
+    pub info: FileInfo,
     /// The data needed to rerun the analysis for this file. `Some` only when
     /// [`include_analysis_data`](crate::DolosConfigBuilder::include_analysis_data)
     /// is set.
     pub analysis_data: Option<AnalysisData>,
+}
+
+/// The data of the `info.csv` row of a file.
+///
+/// A value is `None` when the input has no `info.csv`, when the row has no
+/// value or when the `info.csv` has no such column.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FileInfo {
+    /// The value of the `full_name` column.
+    pub full_name: Option<String>,
+    /// The value of the `labels` column, or of the `label` column when
+    /// `labels` has no value.
+    pub labels: Option<String>,
+    /// The value of the `created_at` column. `None` also when the value is
+    /// not a timestamp in RFC 3339 or in the format `2019-07-23 17:12:33 +0200`.
+    pub created_at: Option<DateTime<FixedOffset>>,
 }
 
 /// Everything the analysis needs for one file. With it, a pair can be analysed
@@ -84,6 +103,8 @@ impl fmt::Debug for File {
 pub struct FileSet {
     pub base_dir: PathBuf,
     pub relative_paths: Vec<PathBuf>,
+    /// The `info.csv` data of the files, by relative path.
+    pub info: HashMap<PathBuf, FileInfo>,
 }
 
 impl FileSet {
@@ -91,12 +112,22 @@ impl FileSet {
     /// Each path is stripped of the `base_dir` prefix to produce the relative
     /// (display) paths stored in `relative_paths`.
     pub fn new(base_dir: impl Into<PathBuf>, files: Vec<PathBuf>) -> Self {
+        let files = files.into_iter().map(|path| (path, FileInfo::default()));
+        Self::with_info(base_dir, files.collect())
+    }
+
+    /// Create a `FileSet` as [`FileSet::new`] does, and keep the `info.csv`
+    /// data of each file.
+    pub fn with_info(base_dir: impl Into<PathBuf>, files: Vec<(PathBuf, FileInfo)>) -> Self {
         let base_dir = base_dir.into();
-        let relative_paths = files
-            .into_iter()
-            .map(|p| p.strip_prefix(&base_dir).unwrap_or(&p).to_path_buf())
-            .collect();
-        Self { base_dir, relative_paths }
+        let mut relative_paths = Vec::with_capacity(files.len());
+        let mut info = HashMap::with_capacity(files.len());
+        for (path, file_info) in files {
+            let relative = path.strip_prefix(&base_dir).unwrap_or(&path).to_path_buf();
+            info.insert(relative.clone(), file_info);
+            relative_paths.push(relative);
+        }
+        Self { base_dir, relative_paths, info }
     }
 
     /// Detect the language that the most file extensions belong to.

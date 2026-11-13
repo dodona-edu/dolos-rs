@@ -51,30 +51,20 @@ impl Input {
     }
 
     fn from_directory(dir: &Path) -> Result<Self> {
-        let (name, files) = resolve::from_directory(dir)?;
-        Ok(Self {
-            name: Some(name),
-            file_set: FileSet::new(dir, files),
-            temp_dir: None,
-        })
+        let (name, file_set) = resolve::from_directory(dir)?;
+        Ok(Self { name: Some(name), file_set, temp_dir: None })
     }
 
     fn from_csv(csv_path: &Path) -> Result<Self> {
-        let (name, files) = resolve::from_csv(csv_path)?;
-        let base_dir = csv_path.parent().unwrap_or(Path::new("."));
-        Ok(Self {
-            name: Some(name),
-            file_set: FileSet::new(base_dir, files),
-            temp_dir: None,
-        })
+        let (name, file_set) = resolve::from_csv(csv_path)?;
+        Ok(Self { name: Some(name), file_set, temp_dir: None })
     }
 
     fn from_archive(extracted: archive::ExtractionResult) -> Result<Self> {
-        let dir = extracted.temp_dir.path();
-        let (_, files) = resolve::from_directory(dir)?;
+        let (_, file_set) = resolve::from_directory(extracted.temp_dir.path())?;
         Ok(Self {
             name: Some(extracted.name),
-            file_set: FileSet::new(dir, files),
+            file_set,
             temp_dir: Some(extracted.temp_dir),
         })
     }
