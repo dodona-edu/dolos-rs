@@ -82,7 +82,7 @@ fn csv_output_writes_the_headers() {
     assert_csv_header(&report_dir.join("metadata.csv"), &["property", "value"]);
     assert_csv_header(
         &report_dir.join("files.csv"),
-        &["id", "path", "content", "fingerprints", "fingerprintRegions", "ignoredIntervals"],
+        &["id", "path", "content", "fingerprints", "fingerprintRegions", "ignoredIntervals", "fullName", "labels", "createdAt"],
     );
     assert_csv_header(
         &report_dir.join("pairs.csv"),
@@ -186,6 +186,32 @@ fn analysis_data_columns_hold_four_region_numbers_per_fingerprint() {
         // Nothing is ignored without a template or a frequency cap.
         assert_eq!(&row[5], "[]");
     }
+}
+
+#[test]
+fn files_csv_holds_the_info_csv_data_of_each_file() {
+    let tmp = TempDir::new().unwrap();
+    let dataset = tmp.path().join("dataset");
+    std::fs::create_dir(&dataset).unwrap();
+    std::fs::copy(SAMPLE1, dataset.join("a.js")).unwrap();
+    std::fs::copy(SAMPLE2, dataset.join("b.js")).unwrap();
+    std::fs::write(
+        dataset.join("info.csv"),
+        "filename,full_name,created_at,labels\n\
+         a.js,Ada Lovelace,2019-07-23 17:12:33 +0200,group-1\n\
+         b.js,,,\n",
+    )
+    .unwrap();
+
+    let report_dir = csv_report_of(&tmp, &[dataset.to_str().unwrap()], &[]);
+
+    let files = report_dir.join("files.csv");
+    assert_eq!(read_column(&files, "fullName"), ["Ada Lovelace", ""]);
+    assert_eq!(read_column(&files, "labels"), ["group-1", ""]);
+    assert_eq!(
+        read_column(&files, "createdAt"),
+        ["2019-07-23T17:12:33+02:00", ""]
+    );
 }
 
 #[test]

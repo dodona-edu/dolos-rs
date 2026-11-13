@@ -20,11 +20,16 @@ impl<'a> MetadataRow<'a> {
 
 /// One row of `files.csv`.
 ///
-/// The last three are empty unless `--include-analysis-data` was given:
+/// The next three are empty unless `--include-analysis-data` was given:
 /// - `fingerprints`: one hash per fingerprint, `[hash,...]`.
 /// - `fingerprintRegions`: `[startRow,startCol,endRow,endCol]` per fingerprint.
 /// - `ignoredIntervals`: `[start,end]` per ignored run, a half-open interval of fingerprint
 ///   indices.
+///
+/// The last three hold the `info.csv` data of the file. A value is empty when the file has none:
+/// - `fullName`: the `full_name` column.
+/// - `labels`: the `labels` column, or the `label` column when `labels` has no value.
+/// - `createdAt`: the `created_at` column, as an RFC 3339 timestamp.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
     id: usize,
@@ -33,16 +38,22 @@ pub struct FileRow<'a> {
     fingerprints: Option<String>,
     fingerprint_regions: Option<String>,
     ignored_intervals: Option<String>,
+    full_name: Option<&'a str>,
+    labels: Option<&'a str>,
+    created_at: Option<String>,
 }
 
 impl<'a> FileRow<'a> {
-    pub const HEADER: [&'static str; 6] = [
+    pub const HEADER: [&'static str; 9] = [
         "id",
         "path",
         "content",
         "fingerprints",
         "fingerprintRegions",
         "ignoredIntervals",
+        "fullName",
+        "labels",
+        "createdAt",
     ];
 
     pub fn new(file: &'a File) -> Self {
@@ -54,6 +65,9 @@ impl<'a> FileRow<'a> {
             fingerprints: data.map(|d| bracketed(&d.fingerprints, usize::to_string)),
             fingerprint_regions: data.map(|d| bracketed(&d.regions, region_to_string)),
             ignored_intervals: data.map(|d| bracketed(&d.ignored, range_to_string)),
+            full_name: file.info.full_name.as_deref(),
+            labels: file.info.labels.as_deref(),
+            created_at: file.info.created_at.map(|timestamp| timestamp.to_rfc3339()),
         }
     }
 }
