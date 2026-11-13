@@ -43,7 +43,9 @@ impl Dolos {
     ///     relative to the directory of the CSV file.
     ///
     ///   The other columns of the CSV file that are read fill the
-    ///   [`FileInfo`](crate::FileInfo) of each file.
+    ///   [`FileInfo`](crate::FileInfo) of each file. A row with `true` in the
+    ///   `ignored` column gives a template file: the file is not analyzed, and
+    ///   it is added to the [`template`](crate::DolosConfigBuilder::template).
     ///   - **One archive** (`.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`,
     ///     `.tbz`, `.tbz2`): extracted, then read as a directory.
     /// - `config`: the analysis configuration. See [`DolosConfig::builder`].
@@ -130,6 +132,7 @@ impl Dolos {
 
         dolos.add_files(&dataset.file_set)?;
 
+        dolos.add_template(&dataset.template)?;
         dolos.add_template(&template.file_set)?;
 
         Ok(dolos)
@@ -167,7 +170,11 @@ impl Dolos {
                 id: self.files.len(),
                 relative_path: relative.clone(),
                 content,
-                info: file_set.info.get(relative).cloned().unwrap_or_default(),
+                info: file_set
+                    .info
+                    .get(relative)
+                    .map(|row| row.info.clone())
+                    .unwrap_or_default(),
                 analysis_data: None,
             });
         }

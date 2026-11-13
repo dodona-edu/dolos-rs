@@ -46,6 +46,14 @@ pub struct FileInfo {
     pub created_at: Option<DateTime<FixedOffset>>,
 }
 
+/// What one row of an `info.csv` file says about its file.
+#[derive(Debug, Clone, Default)]
+pub struct InfoRow {
+    pub info: FileInfo,
+    /// Whether the `ignored` column holds `true`.
+    pub ignored: bool,
+}
+
 /// Everything the analysis needs for one file. With it, a pair can be analysed
 /// again from the report alone.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,8 +111,8 @@ impl fmt::Debug for File {
 pub struct FileSet {
     pub base_dir: PathBuf,
     pub relative_paths: Vec<PathBuf>,
-    /// The `info.csv` data of the files, by relative path.
-    pub info: HashMap<PathBuf, FileInfo>,
+    /// The `info.csv` rows of the files, by relative path.
+    pub info: HashMap<PathBuf, InfoRow>,
 }
 
 impl FileSet {
@@ -112,22 +120,37 @@ impl FileSet {
     /// Each path is stripped of the `base_dir` prefix to produce the relative
     /// (display) paths stored in `relative_paths`.
     pub fn new(base_dir: impl Into<PathBuf>, files: Vec<PathBuf>) -> Self {
-        let files = files.into_iter().map(|path| (path, FileInfo::default()));
+        let files = files.into_iter().map(|path| (path, InfoRow::default()));
         Self::with_info(base_dir, files.collect())
     }
 
     /// Create a `FileSet` as [`FileSet::new`] does, and keep the `info.csv`
-    /// data of each file.
-    pub fn with_info(base_dir: impl Into<PathBuf>, files: Vec<(PathBuf, FileInfo)>) -> Self {
+    /// row of each file.
+    pub fn with_info(base_dir: impl Into<PathBuf>, files: Vec<(PathBuf, InfoRow)>) -> Self {
         let base_dir = base_dir.into();
         let mut relative_paths = Vec::with_capacity(files.len());
         let mut info = HashMap::with_capacity(files.len());
-        for (path, file_info) in files {
+        for (path, row) in files {
             let relative = path.strip_prefix(&base_dir).unwrap_or(&path).to_path_buf();
-            info.insert(relative.clone(), file_info);
+            info.insert(relative.clone(), row);
             relative_paths.push(relative);
         }
         Self { base_dir, relative_paths, info }
+    }
+
+    /// Remove the files of the `info.csv` rows with `ignored=true` and return
+    /// them as a `FileSet` with the same base directory.
+    pub fn take_ignored(&mut self) -> FileSet {
+        let is_ignored = |path: &PathBuf| self.info.get(path).is_some_and(|row| row.ignored);
+        let (ignored, kept) = std::mem::take(&mut self.relative_paths)
+            .into_iter()
+            .partition(is_ignored);
+        self.relative_paths = kept;
+        FileSet {
+            base_dir: self.base_dir.clone(),
+            relative_paths: ignored,
+            info: HashMap::new(),
+        }
     }
 
     /// Detect the language that the most file extensions belong to.

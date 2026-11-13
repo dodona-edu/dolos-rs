@@ -2,6 +2,7 @@ use dolos::{AnalysisData, Dolos, DolosConfig, File, Language, PairSortBy, Report
 use dolos_core::AnalysisOptions;
 use rstest::rstest;
 use std::path::PathBuf;
+use tempfile::TempDir;
 
 const SAMPLE12: &[&str] = &["fixtures/sample1.js", "fixtures/sample2.js"];
 const SAMPLE123: &[&str] = &[
@@ -245,6 +246,59 @@ fn template_without_files_of_the_language_is_rejected() {
     let err = Dolos::new(to_path_buf(SAMPLE12), config).unwrap_err();
 
     assert_eq!(err.kind(), std::io::ErrorKind::InvalidInput);
+}
+
+/// A directory with the files of `SAMPLE12` and the two templates, and an
+/// `info.csv` that holds `rows` after the header `filename,ignored`.
+fn dataset_with_info(rows: &str) -> TempDir {
+    let dir = TempDir::new().unwrap();
+    for file in SAMPLE12.iter().chain(&[TEMPLATE, TEMPLATE_INERT]) {
+        let name = file.strip_prefix("fixtures/").unwrap();
+        std::fs::copy(file, dir.path().join(name)).unwrap();
+    }
+    let info = format!("filename,ignored\n{rows}");
+    std::fs::write(dir.path().join("info.csv"), info).unwrap();
+    dir
+}
+
+#[test]
+fn ignored_rows_of_info_csv_are_template_files() {
+    let dataset = dataset_with_info(
+        "sample1.js,false\n\
+         sample_ignore.js,true\n\
+         sample2.js,\n\
+         sample_ignore_inert.js,true\n",
+    );
+    let report = Dolos::new(vec![dataset.path().into()], DolosConfig::default())
+        .unwrap()
+        .build_report();
+
+    assert_eq!(
+        kept_paths(&report),
+        to_path_buf(&["sample1.js", "sample2.js"])
+    );
+    assert_eq!(report.pairs.len(), 1);
+    // The similarity of `SAMPLE12` with `TEMPLATE` as the template.
+    assert_eq!(report.pairs[0].metrics.similarity, 0.43548387096774194);
+}
+
+#[test]
+fn ignored_rows_and_the_configured_template_are_both_used() {
+    let dataset = dataset_with_info(
+        "sample1.js,\n\
+         sample2.js,\n\
+         sample_ignore.js,true\n",
+    );
+    let config = DolosConfig::builder()
+        .template([TEMPLATE_INERT])
+        .build()
+        .unwrap();
+    let report = Dolos::new(vec![dataset.path().into()], config)
+        .unwrap()
+        .build_report();
+
+    assert_eq!(report.files.len(), 2);
+    assert_eq!(report.pairs[0].metrics.similarity, 0.43548387096774194);
 }
 
 #[test]
