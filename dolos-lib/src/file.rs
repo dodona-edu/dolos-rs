@@ -42,6 +42,14 @@ pub struct FileInfo {
     pub created_at: Option<DateTime<FixedOffset>>,
 }
 
+/// What one row of an `info.csv` file says about its file.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct InfoRow {
+    pub info: FileInfo,
+    /// Whether the `ignored` column holds `true`.
+    pub ignored: bool,
+}
+
 /// Everything the analysis needs for one file. With it, a pair can be analysed
 /// again from the report alone.
 #[derive(Debug, Clone, PartialEq, Eq)]

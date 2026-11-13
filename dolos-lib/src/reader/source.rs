@@ -11,6 +11,8 @@ pub struct Source {
     /// The files in input order. Their paths are relative to the input
     /// directory, the directory of the CSV file or the extracted archive.
     pub files: Vec<File>,
+    /// The files of the `info.csv` rows with `ignored=true`, read as template files.
+    pub template: Vec<File>,
     pub language: Language,
 }
 
@@ -18,6 +20,7 @@ impl Source {
     /// Create a `Source` from the given input paths, in the forms that
     /// [`Input::open`] accepts.
     ///
+    /// The files of the `info.csv` rows with `ignored=true` go to `template`.
     /// Only the files of `language` are kept. When `language` is `None`, the
     /// language that most file extensions belong to is used. The other files,
     /// and the files that cannot be read, are skipped with a warning. Without a
@@ -27,12 +30,14 @@ impl Source {
     /// Fails when the paths cannot be read, the language cannot be detected or
     /// fewer than 2 readable files remain.
     pub fn create(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
-        let input = Input::open(paths)?;
+        let mut input = Input::open(paths)?;
+        let ignored = input.take_ignored();
         let language = match language {
             Some(language) => language,
             None => input.detect_language()?,
         };
 
+        let template = ignored.read_files(language, "template file");
         let name = input.name.clone();
         let files = input.read_files(language, "file");
         if files.len() < 2 {
@@ -46,7 +51,7 @@ impl Source {
             let paths: Vec<PathBuf> = files.iter().map(|f| f.relative_path.clone()).collect();
             resolve::files_name(&paths)
         });
-        Ok(Self { name, files, language })
+        Ok(Self { name, files, template, language })
     }
 }
 

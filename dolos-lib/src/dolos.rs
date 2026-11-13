@@ -47,7 +47,10 @@ impl Dolos {
     ///     `.tbz`, `.tbz2`): extracted, then read as a directory.
     ///
     ///   The `full_name`, `labels` and `created_at` columns of the CSV
-    ///   file fill the [`FileInfo`](crate::FileInfo) of each file.
+    ///   file fill the [`FileInfo`](crate::FileInfo) of each file. A row with
+    ///   `true` in the `ignored` column gives a template file: the file is not
+    ///   analyzed, and it is added to the
+    ///   [`template`](crate::DolosConfigBuilder::template).
     /// - `config`: the analysis configuration. See [`DolosConfig::builder`].
     ///
     /// # Errors
@@ -278,7 +281,7 @@ fn read_input(files: Vec<PathBuf>, config: DolosConfig) -> Result<(Source, Metad
     let description = read_description(&files);
     let span = tracing::info_span!("read", %description, error = tracing::field::Empty);
     span.in_scope(|| {
-        let source = Source::create(files, config.language)?;
+        let mut source = Source::create(files, config.language)?;
         if config.max_fingerprint_percentage.is_some() && source.files.len() < 3 {
             tracing::warn!(
                 "the maximum fingerprint percentage has no use with fewer than 3 files; \
@@ -286,7 +289,8 @@ fn read_input(files: Vec<PathBuf>, config: DolosConfig) -> Result<(Source, Metad
             );
         }
         let metadata = Metadata::from_config(&config, &source);
-        let template = Template::create(config.template, metadata.language)?;
+        let mut template = Template::create(config.template, metadata.language)?;
+        template.files.append(&mut source.template);
         Ok((source, metadata, template))
     })
     .inspect_err(|e| {

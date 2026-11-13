@@ -1,5 +1,5 @@
 use crate::error::context;
-use crate::file::FileInfo;
+use crate::file::{FileInfo, InfoRow};
 use chrono::{DateTime, FixedOffset};
 use csv::{Reader, StringRecord};
 use std::fs;
@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 /// Resolve files from a directory. If an `info.csv` is present at the top
 /// level, it is used to determine the file list; otherwise files are collected
 /// recursively.
-pub fn from_directory(dir: &Path) -> Result<(String, Vec<(PathBuf, FileInfo)>)> {
+pub fn from_directory(dir: &Path) -> Result<(String, Vec<(PathBuf, InfoRow)>)> {
     let csv_path = dir.join("info.csv");
     let files = if csv_path.is_file() {
         files_from_csv(&csv_path)?
@@ -21,14 +21,14 @@ pub fn from_directory(dir: &Path) -> Result<(String, Vec<(PathBuf, FileInfo)>)> 
 
 /// Resolve files from a CSV file. The name is derived from the CSV's parent
 /// directory.
-pub fn from_csv(csv_path: &Path) -> Result<(String, Vec<(PathBuf, FileInfo)>)> {
+pub fn from_csv(csv_path: &Path) -> Result<(String, Vec<(PathBuf, InfoRow)>)> {
     let files = files_from_csv(csv_path)?;
     Ok((dir_name(csv_dir(csv_path))?, files))
 }
 
 /// Resolve files from an explicit list of paths. All paths must be existing
 /// files.
-pub fn from_files(paths: Vec<PathBuf>) -> Result<Vec<(PathBuf, FileInfo)>> {
+pub fn from_files(paths: Vec<PathBuf>) -> Result<Vec<(PathBuf, InfoRow)>> {
     if let Some(path) = paths.iter().find(|p| !p.is_file()) {
         return Err(Error::new(
             ErrorKind::NotFound,
@@ -38,11 +38,11 @@ pub fn from_files(paths: Vec<PathBuf>) -> Result<Vec<(PathBuf, FileInfo)>> {
     Ok(without_info(paths))
 }
 
-/// Give each of `paths` an empty [`FileInfo`].
-fn without_info(paths: Vec<PathBuf>) -> Vec<(PathBuf, FileInfo)> {
+/// Give each of `paths` an empty [`InfoRow`].
+fn without_info(paths: Vec<PathBuf>) -> Vec<(PathBuf, InfoRow)> {
     paths
         .into_iter()
-        .map(|path| (path, FileInfo::default()))
+        .map(|path| (path, InfoRow::default()))
         .collect()
 }
 
@@ -58,8 +58,8 @@ pub fn files_name(paths: &[PathBuf]) -> String {
     }
 }
 
-/// Read the path and the [`FileInfo`] of each row of a CSV file.
-fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, FileInfo)>> {
+/// Read the path and the [`InfoRow`] of each row of a CSV file.
+fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, InfoRow)>> {
     let dir = csv_dir(csv_path);
     let invalid = |e: csv::Error| {
         let message = format!("could not read the csv file '{}': {e}", csv_path.display());
@@ -85,11 +85,12 @@ fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, FileInfo)>> {
         .collect()
 }
 
-/// The positions of the columns of a CSV file that fill a [`FileInfo`].
+/// The positions of the columns of a CSV file that fill an [`InfoRow`].
 struct InfoColumns {
     full_name: Option<usize>,
     labels: Option<usize>,
     created_at: Option<usize>,
+    ignored: Option<usize>,
 }
 
 impl InfoColumns {
@@ -99,17 +100,19 @@ impl InfoColumns {
             full_name: position("full_name"),
             labels: position("labels"),
             created_at: position("created_at"),
+            ignored: position("ignored"),
         }
     }
 
-    /// Read the [`FileInfo`] of one row. An empty value gives `None`.
-    fn read(&self, record: &StringRecord) -> FileInfo {
+    /// Read the [`InfoRow`] of one row. An empty value gives `None`.
+    fn read(&self, record: &StringRecord) -> InfoRow {
         let value = |column: Option<usize>| record.get(column?).filter(|value| !value.is_empty());
-        FileInfo {
+        let info = FileInfo {
             full_name: value(self.full_name).map(str::to_owned),
             labels: value(self.labels).map(split_labels).unwrap_or_default(),
             created_at: value(self.created_at).and_then(parse_created_at),
-        }
+        };
+        InfoRow { info, ignored: value(self.ignored) == Some("true") }
     }
 }
 
@@ -181,13 +184,26 @@ mod tests {
     use rstest::rstest;
     use tempfile::tempdir;
 
-    /// Write `content` to an `info.csv` and read the [`FileInfo`] of each row.
-    fn info_of_csv(content: &str) -> Vec<FileInfo> {
+    /// Write `content` to an `info.csv` and read the [`InfoRow`] of each row.
+    fn rows_of_csv(content: &str) -> Vec<InfoRow> {
         let tmp = tempdir().unwrap();
         let csv_path = tmp.path().join("info.csv");
         fs::write(&csv_path, content).unwrap();
         let files = files_from_csv(&csv_path).unwrap();
-        files.into_iter().map(|(_, info)| info).collect()
+        files.into_iter().map(|(_, row)| row).collect()
+    }
+
+    /// Write `content` to an `info.csv` and read the [`FileInfo`] of each row.
+    fn info_of_csv(content: &str) -> Vec<FileInfo> {
+        let rows = rows_of_csv(content);
+        rows.into_iter().map(|row| row.info).collect()
+    }
+
+    #[test]
+    fn only_the_value_true_marks_a_row_as_ignored() {
+        let rows = rows_of_csv("filename,ignored\na.js,true\nb.js,false\nc.js,\nd.js,TRUE\n");
+        let ignored: Vec<bool> = rows.iter().map(|row| row.ignored).collect();
+        assert_eq!(ignored, [true, false, false, false]);
     }
 
     #[test]

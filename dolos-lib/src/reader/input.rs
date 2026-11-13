@@ -1,4 +1,4 @@
-use crate::file::{File, FileInfo};
+use crate::file::{File, InfoRow};
 use std::collections::HashMap;
 use std::fs;
 use std::io::{Error, ErrorKind, Result};
@@ -15,9 +15,9 @@ pub struct Input {
     /// separate files.
     pub name: Option<String>,
     base_dir: PathBuf,
-    /// The paths relative to `base_dir`, with the `info.csv` data of each file.
+    /// The paths relative to `base_dir`, with the `info.csv` row of each file.
     /// The paths are the display paths of the files.
-    files: Vec<(PathBuf, FileInfo)>,
+    files: Vec<(PathBuf, InfoRow)>,
     /// The extracted archive. The extracted files exist as long as it lives.
     _extracted: Option<TempDir>,
 }
@@ -64,7 +64,7 @@ impl Input {
     fn new(
         name: Option<String>,
         base_dir: impl Into<PathBuf>,
-        files: Vec<(PathBuf, FileInfo)>,
+        files: Vec<(PathBuf, InfoRow)>,
         extracted: Option<TempDir>,
     ) -> Self {
         let base_dir = base_dir.into();
@@ -73,6 +73,22 @@ impl Input {
             .map(|(p, info)| (p.strip_prefix(&base_dir).unwrap_or(&p).to_path_buf(), info))
             .collect();
         Self { name, base_dir, files, _extracted: extracted }
+    }
+
+    /// Remove the files of the `info.csv` rows with `ignored=true` and return
+    /// them as an `Input` with the same base directory. Read them while `self`
+    /// lives: `self` keeps the extracted archive.
+    pub fn take_ignored(&mut self) -> Input {
+        let (ignored, kept) = std::mem::take(&mut self.files)
+            .into_iter()
+            .partition(|(_, row)| row.ignored);
+        self.files = kept;
+        Input {
+            name: None,
+            base_dir: self.base_dir.clone(),
+            files: ignored,
+            _extracted: None,
+        }
     }
 
     /// Detect the language that the most file extensions belong to.
@@ -135,13 +151,13 @@ impl Input {
         }
 
         let mut files = Vec::new();
-        for (relative_path, info) in kept {
+        for (relative_path, row) in kept {
             match fs::read_to_string(self.base_dir.join(&relative_path)) {
                 Ok(content) => files.push(File {
                     id: files.len(),
                     relative_path,
                     content,
-                    info,
+                    info: row.info,
                     analysis_data: None,
                 }),
                 Err(e) => tracing::warn!("skipped {noun} '{}': {e}", relative_path.display()),
@@ -159,7 +175,7 @@ mod tests {
     fn input(paths: &[&str]) -> Input {
         let files = paths
             .iter()
-            .map(|path| (PathBuf::from(path), FileInfo::default()))
+            .map(|path| (PathBuf::from(path), InfoRow::default()))
             .collect();
         Input::new(None, "", files, None)
     }
@@ -169,7 +185,7 @@ mod tests {
         let input = Input::open(vec!["fixtures/sample1.js".into()]).unwrap();
         assert_eq!(input.name, None);
         let path = PathBuf::from("fixtures/sample1.js");
-        assert_eq!(input.files, [(path, FileInfo::default())]);
+        assert_eq!(input.files, [(path, InfoRow::default())]);
     }
 
     #[test]
