@@ -1,5 +1,5 @@
 use crate::views::csv::report_dir::ReportDirectory;
-use crate::views::csv::rows::{FileRow, FragmentRow, MetadataRow, PairRow};
+use crate::views::csv::rows::{FileRow, FragmentRow, Lines, MetadataRow, PairRow};
 use crate::views::view::View;
 use dolos::{Pair, Report};
 use serde::Serialize;
@@ -40,10 +40,11 @@ impl CsvView {
 
         if report.metadata.include_fragments {
             let fragments = report.pairs.iter().flat_map(|pair| {
-                pair.fragments
-                    .iter()
-                    .flatten()
-                    .map(move |fragment| FragmentRow::new(pair, fragment))
+                let left_lines = Lines::new(&pair.left_file.content);
+                let right_lines = Lines::new(&pair.right_file.content);
+                pair.fragments.iter().flatten().map(move |fragment| {
+                    FragmentRow::new(pair, fragment, &left_lines, &right_lines)
+                })
             });
 
             write_table(&dir.file("fragments.csv"), &FragmentRow::HEADER, fragments)?;
