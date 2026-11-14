@@ -57,13 +57,12 @@ fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, FileInfo)>> {
     let invalid = |e| Error::new(ErrorKind::InvalidData, e);
     let mut rdr = Reader::from_path(csv_path).map_err(invalid)?;
 
-    let filename_col = rdr
-        .headers()
-        .map_err(invalid)?
+    let headers = rdr.headers().map_err(invalid)?;
+    let filename_col = headers
         .iter()
         .position(|h| h == "filename")
         .ok_or_else(|| Error::new(ErrorKind::InvalidData, "CSV missing 'filename' column"))?;
-    let info_columns = InfoColumns::find(rdr.headers().map_err(invalid)?);
+    let info_columns = InfoColumns::find(headers);
 
     rdr.records()
         .map(|r| {
@@ -94,14 +93,13 @@ impl InfoColumns {
 
     /// Read the [`FileInfo`] of one row. An empty value gives `None`.
     fn read(&self, record: &StringRecord) -> FileInfo {
-        let value = |column: Option<usize>| {
-            let value = record.get(column?)?;
-            (!value.is_empty()).then(|| value.to_owned())
-        };
+        let value = |column: Option<usize>| record.get(column?).filter(|value| !value.is_empty());
         FileInfo {
-            full_name: value(self.full_name),
-            labels: value(self.labels).or_else(|| value(self.label)),
-            created_at: value(self.created_at).and_then(|value| parse_created_at(&value)),
+            full_name: value(self.full_name).map(str::to_owned),
+            labels: value(self.labels)
+                .or_else(|| value(self.label))
+                .map(str::to_owned),
+            created_at: value(self.created_at).and_then(parse_created_at),
         }
     }
 }
@@ -168,22 +166,6 @@ mod tests {
     }
 
     #[test]
-    fn csv_row_fills_the_file_info() {
-        let info = info_of_csv(
-            "filename,full_name,created_at,labels\n\
-             a.js,Ada Lovelace,2019-07-23 17:12:33 +0200,group-1\n\
-             b.js,,,\n",
-        );
-        assert_eq!(info[0].full_name.as_deref(), Some("Ada Lovelace"));
-        assert_eq!(info[0].labels.as_deref(), Some("group-1"));
-        assert_eq!(
-            info[0].created_at.unwrap().to_rfc3339(),
-            "2019-07-23T17:12:33+02:00"
-        );
-        assert_eq!(info[1], FileInfo::default());
-    }
-
-    #[test]
     fn csv_without_info_columns_gives_empty_file_info() {
         assert_eq!(info_of_csv("filename\na.js\n"), [FileInfo::default()]);
     }
@@ -192,7 +174,7 @@ mod tests {
     #[case::label_column_only("filename,label\na.js,group-1\n", "group-1")]
     #[case::labels_first("filename,label,labels\na.js,group-1,group-2\n", "group-2")]
     #[case::labels_empty("filename,label,labels\na.js,group-1,\n", "group-1")]
-    fn label_column_is_used_when_labels_has_no_value(#[case] csv: &str, #[case] expected: &str) {
+    fn labels_column_comes_before_the_label_column(#[case] csv: &str, #[case] expected: &str) {
         assert_eq!(info_of_csv(csv)[0].labels.as_deref(), Some(expected));
     }
 

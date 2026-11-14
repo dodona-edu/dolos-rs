@@ -112,22 +112,21 @@ impl FileSet {
     /// Each path is stripped of the `base_dir` prefix to produce the relative
     /// (display) paths stored in `relative_paths`.
     pub fn new(base_dir: impl Into<PathBuf>, files: Vec<PathBuf>) -> Self {
-        let files = files.into_iter().map(|path| (path, FileInfo::default()));
-        Self::with_info(base_dir, files.collect())
+        let base_dir = base_dir.into();
+        let relative_paths = files
+            .into_iter()
+            .map(|p| p.strip_prefix(&base_dir).unwrap_or(&p).to_path_buf())
+            .collect();
+        Self { base_dir, relative_paths, info: HashMap::new() }
     }
 
     /// Create a `FileSet` as [`FileSet::new`] does, and keep the `info.csv`
     /// data of each file.
     pub fn with_info(base_dir: impl Into<PathBuf>, files: Vec<(PathBuf, FileInfo)>) -> Self {
-        let base_dir = base_dir.into();
-        let mut relative_paths = Vec::with_capacity(files.len());
-        let mut info = HashMap::with_capacity(files.len());
-        for (path, file_info) in files {
-            let relative = path.strip_prefix(&base_dir).unwrap_or(&path).to_path_buf();
-            info.insert(relative.clone(), file_info);
-            relative_paths.push(relative);
-        }
-        Self { base_dir, relative_paths, info }
+        let (paths, info): (Vec<_>, Vec<_>) = files.into_iter().unzip();
+        let mut file_set = Self::new(base_dir, paths);
+        file_set.info = file_set.relative_paths.iter().cloned().zip(info).collect();
+        file_set
     }
 
     /// Detect the language that the most file extensions belong to.
