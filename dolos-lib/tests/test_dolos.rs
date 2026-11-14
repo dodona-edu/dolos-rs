@@ -290,7 +290,7 @@ fn ignored_rows_and_the_configured_template_are_both_used() {
          sample_ignore.js,true\n",
     );
     let config = DolosConfig::builder()
-        .template([TEMPLATE_INERT])
+        .template(["fixtures/sample3.js"])
         .build()
         .unwrap();
     let report = Dolos::new(vec![dataset.path().into()], config)
@@ -298,7 +298,8 @@ fn ignored_rows_and_the_configured_template_are_both_used() {
         .build_report();
 
     assert_eq!(report.files.len(), 2);
-    assert_eq!(report.pairs[0].metrics.similarity, 0.43548387096774194);
+    // Not the similarity with only `TEMPLATE` (0.435...) or only `sample3.js` (0.053...).
+    assert_eq!(report.pairs[0].metrics.similarity, 0.05405405405405406);
 }
 
 #[test]
