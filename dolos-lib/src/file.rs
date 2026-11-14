@@ -120,22 +120,21 @@ impl FileSet {
     /// Each path is stripped of the `base_dir` prefix to produce the relative
     /// (display) paths stored in `relative_paths`.
     pub fn new(base_dir: impl Into<PathBuf>, files: Vec<PathBuf>) -> Self {
-        let files = files.into_iter().map(|path| (path, InfoRow::default()));
-        Self::with_info(base_dir, files.collect())
+        let base_dir = base_dir.into();
+        let relative_paths = files
+            .into_iter()
+            .map(|p| p.strip_prefix(&base_dir).unwrap_or(&p).to_path_buf())
+            .collect();
+        Self { base_dir, relative_paths, info: HashMap::new() }
     }
 
     /// Create a `FileSet` as [`FileSet::new`] does, and keep the `info.csv`
     /// row of each file.
     pub fn with_info(base_dir: impl Into<PathBuf>, files: Vec<(PathBuf, InfoRow)>) -> Self {
-        let base_dir = base_dir.into();
-        let mut relative_paths = Vec::with_capacity(files.len());
-        let mut info = HashMap::with_capacity(files.len());
-        for (path, row) in files {
-            let relative = path.strip_prefix(&base_dir).unwrap_or(&path).to_path_buf();
-            info.insert(relative.clone(), row);
-            relative_paths.push(relative);
-        }
-        Self { base_dir, relative_paths, info }
+        let (paths, rows): (Vec<_>, Vec<_>) = files.into_iter().unzip();
+        let mut file_set = Self::new(base_dir, paths);
+        file_set.info = file_set.relative_paths.iter().cloned().zip(rows).collect();
+        file_set
     }
 
     /// Remove the files of the `info.csv` rows with `ignored=true` and return

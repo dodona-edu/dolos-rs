@@ -41,13 +41,14 @@ impl Dolos {
     ///     column instead.
     ///   - **One CSV file**: the files listed in its `filename` column,
     ///     relative to the directory of the CSV file.
-    ///
-    ///   The other columns of the CSV file that are read fill the
-    ///   [`FileInfo`](crate::FileInfo) of each file. A row with `true` in the
-    ///   `ignored` column gives a template file: the file is not analyzed, and
-    ///   it is added to the [`template`](crate::DolosConfigBuilder::template).
     ///   - **One archive** (`.zip`, `.tar`, `.tar.gz`, `.tgz`, `.tar.bz2`,
     ///     `.tbz`, `.tbz2`): extracted, then read as a directory.
+    ///
+    ///   The `full_name`, `labels`, `label` and `created_at` columns of the CSV
+    ///   file fill the [`FileInfo`](crate::FileInfo) of each file. A row with
+    ///   `true` in the `ignored` column gives a template file: the file is not
+    ///   analyzed, and it is added to the
+    ///   [`template`](crate::DolosConfigBuilder::template).
     /// - `config`: the analysis configuration. See [`DolosConfig::builder`].
     ///
     /// # Errors
