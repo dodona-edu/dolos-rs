@@ -1,4 +1,4 @@
-use crate::file::{FileInfo, FileSet};
+use crate::file::{FileInfo, FileSet, InfoRow};
 use chrono::{DateTime, FixedOffset};
 use csv::{Reader, StringRecord};
 use std::fs;
@@ -51,8 +51,8 @@ pub fn files_name(paths: &[PathBuf]) -> String {
     }
 }
 
-/// Read the path and the [`FileInfo`] of each row of a CSV file.
-fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, FileInfo)>> {
+/// Read the path and the [`InfoRow`] of each row of a CSV file.
+fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, InfoRow)>> {
     let dir = csv_dir(csv_path);
     let invalid = |e| Error::new(ErrorKind::InvalidData, e);
     let mut rdr = Reader::from_path(csv_path).map_err(invalid)?;
@@ -72,12 +72,13 @@ fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, FileInfo)>> {
         .collect()
 }
 
-/// The positions of the columns of a CSV file that fill a [`FileInfo`].
+/// The positions of the columns of a CSV file that fill an [`InfoRow`].
 struct InfoColumns {
     full_name: Option<usize>,
     labels: Option<usize>,
     label: Option<usize>,
     created_at: Option<usize>,
+    ignored: Option<usize>,
 }
 
 impl InfoColumns {
@@ -88,19 +89,22 @@ impl InfoColumns {
             labels: position("labels"),
             label: position("label"),
             created_at: position("created_at"),
+            ignored: position("ignored"),
         }
     }
 
-    /// Read the [`FileInfo`] of one row. An empty value gives `None`.
-    fn read(&self, record: &StringRecord) -> FileInfo {
+    /// Read the [`InfoRow`] of one row. An empty value gives `None`. Only the
+    /// value `true` in the `ignored` column marks the row as ignored.
+    fn read(&self, record: &StringRecord) -> InfoRow {
         let value = |column: Option<usize>| record.get(column?).filter(|value| !value.is_empty());
-        FileInfo {
+        let info = FileInfo {
             full_name: value(self.full_name).map(str::to_owned),
             labels: value(self.labels)
                 .or_else(|| value(self.label))
                 .map(str::to_owned),
             created_at: value(self.created_at).and_then(parse_created_at),
-        }
+        };
+        InfoRow { info, ignored: value(self.ignored) == Some("true") }
     }
 }
 
@@ -156,13 +160,26 @@ mod tests {
     use rstest::rstest;
     use tempfile::tempdir;
 
-    /// Write `content` to an `info.csv` and read the [`FileInfo`] of each row.
-    fn info_of_csv(content: &str) -> Vec<FileInfo> {
+    /// Write `content` to an `info.csv` and read the [`InfoRow`] of each row.
+    fn rows_of_csv(content: &str) -> Vec<InfoRow> {
         let tmp = tempdir().unwrap();
         let csv_path = tmp.path().join("info.csv");
         fs::write(&csv_path, content).unwrap();
         let files = files_from_csv(&csv_path).unwrap();
-        files.into_iter().map(|(_, info)| info).collect()
+        files.into_iter().map(|(_, row)| row).collect()
+    }
+
+    /// Write `content` to an `info.csv` and read the [`FileInfo`] of each row.
+    fn info_of_csv(content: &str) -> Vec<FileInfo> {
+        let rows = rows_of_csv(content);
+        rows.into_iter().map(|row| row.info).collect()
+    }
+
+    #[test]
+    fn only_the_value_true_marks_a_row_as_ignored() {
+        let rows = rows_of_csv("filename,ignored\na.js,true\nb.js,false\nc.js,\nd.js,TRUE\n");
+        let ignored: Vec<bool> = rows.iter().map(|row| row.ignored).collect();
+        assert_eq!(ignored, [true, false, false, false]);
     }
 
     #[test]

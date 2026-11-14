@@ -16,6 +16,8 @@ use super::{Input, resolve};
 pub struct Dataset {
     pub name: String,
     pub file_set: FileSet,
+    /// The files of the `info.csv` rows with `ignored=true`: template files.
+    pub template: FileSet,
     pub language: Language,
     _temp_dir: Option<TempDir>,
 }
@@ -24,6 +26,7 @@ impl Dataset {
     /// Create a `Dataset` from the given input paths, in the forms that
     /// [`Input::read`] accepts.
     ///
+    /// The files of the `info.csv` rows with `ignored=true` go to `template`.
     /// Only the files of `language` are kept. When `language` is `None`, the
     /// language that most file extensions belong to is used. Without a name
     /// from the input, the dataset is named after the files that remain.
@@ -33,12 +36,14 @@ impl Dataset {
     /// fewer than 2 files remain.
     pub fn create(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
         let Input { name, mut file_set, temp_dir } = Input::read(paths)?;
+        let mut template = file_set.take_ignored();
 
         let language = match language {
             Some(language) => language,
             None => file_set.detect_language()?,
         };
 
+        template.retain_language(language);
         file_set.retain_language(language);
         if file_set.relative_paths.len() < 2 {
             return Err(Error::new(
@@ -48,7 +53,7 @@ impl Dataset {
         }
 
         let name = name.unwrap_or_else(|| resolve::files_name(&file_set.relative_paths));
-        Ok(Self { name, file_set, language, _temp_dir: temp_dir })
+        Ok(Self { name, file_set, template, language, _temp_dir: temp_dir })
     }
 }
 

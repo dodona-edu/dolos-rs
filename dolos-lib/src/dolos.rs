@@ -45,7 +45,10 @@ impl Dolos {
     ///     `.tbz`, `.tbz2`): extracted, then read as a directory.
     ///
     ///   The `full_name`, `labels`, `label` and `created_at` columns of the CSV
-    ///   file fill the [`FileInfo`](crate::FileInfo) of each file.
+    ///   file fill the [`FileInfo`](crate::FileInfo) of each file. The file of a
+    ///   row with `true` in the `ignored` column is not analyzed. It is a
+    ///   template file, used together with the files of the
+    ///   [`template`](crate::DolosConfigBuilder::template).
     /// - `config`: the analysis configuration. See [`DolosConfig::builder`].
     ///
     /// # Errors
@@ -130,6 +133,7 @@ impl Dolos {
 
         dolos.add_files(&dataset.file_set)?;
 
+        dolos.add_template(&dataset.template)?;
         dolos.add_template(&template.file_set)?;
 
         Ok(dolos)
@@ -167,7 +171,11 @@ impl Dolos {
                 id: self.files.len(),
                 relative_path: relative.clone(),
                 content,
-                info: file_set.info.get(relative).cloned().unwrap_or_default(),
+                info: file_set
+                    .info
+                    .get(relative)
+                    .map(|row| row.info.clone())
+                    .unwrap_or_default(),
                 analysis_data: None,
             });
         }
