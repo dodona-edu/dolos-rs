@@ -156,6 +156,26 @@ fn fragments_csv_writes_each_region_as_four_numbers() {
 }
 
 #[test]
+fn fragments_csv_writes_utf16_columns() {
+    let tmp = TempDir::new().unwrap();
+    // The line of a.js is 28 bytes and 25 UTF-16 code units. The line of b.js is 24 of both.
+    let files = [
+        ("a.js", r#"let s = "é😀"; let t = 1;"#),
+        ("b.js", r#"let s = "ab"; let t = 1;"#),
+    ]
+    .map(|(name, code)| {
+        let path = tmp.path().join(name);
+        std::fs::write(&path, code).unwrap();
+        path.to_str().unwrap().to_owned()
+    });
+    let report_dir = csv_report_of(&tmp, &[&files[0], &files[1]], &["-k", "2", "-w", "1"]);
+
+    let rows = read_rows(&report_dir.join("fragments.csv"));
+    assert_eq!(rows.len(), 1);
+    assert_eq!((&rows[0][2], &rows[0][3]), ("[0,0,0,25]", "[0,0,0,24]"));
+}
+
+#[test]
 fn analysis_data_columns_are_empty_by_default() {
     let tmp = TempDir::new().unwrap();
     let report_dir = csv_report(&tmp, &[]);

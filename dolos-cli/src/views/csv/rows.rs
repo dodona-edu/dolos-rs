@@ -1,4 +1,4 @@
-use dolos::{File, Fragment, Pair, Region};
+use dolos::{File, Fragment, Pair, Point, Region};
 use serde::Serialize;
 use std::borrow::Cow;
 use std::ops::Range;
@@ -22,7 +22,8 @@ impl<'a> MetadataRow<'a> {
 ///
 /// The last three are empty unless `--include-analysis-data` was given:
 /// - `fingerprints`: one hash per fingerprint, `[hash,...]`.
-/// - `fingerprintRegions`: `[startRow,startCol,endRow,endCol]` per fingerprint.
+/// - `fingerprintRegions`: `[startRow,startCol,endRow,endCol]` per fingerprint. A column is a
+///   UTF-16 code unit offset in its line.
 /// - `ignoredIntervals`: `[start,end]` per ignored run, a half-open interval of fingerprint
 ///   indices.
 #[derive(Serialize)]
@@ -45,14 +46,16 @@ impl<'a> FileRow<'a> {
         "ignoredIntervals",
     ];
 
-    pub fn new(file: &'a File) -> Self {
+    /// `lines` are the lines of `file`.
+    pub fn new(file: &'a File, lines: &Lines) -> Self {
         let data = file.analysis_data.as_ref();
         Self {
             id: file.id,
             path: file.relative_path.to_string_lossy(),
             content: &file.content,
             fingerprints: data.map(|d| bracketed(&d.fingerprints, usize::to_string)),
-            fingerprint_regions: data.map(|d| bracketed(&d.regions, region_to_string)),
+            fingerprint_regions: data
+                .map(|d| bracketed(&d.regions, |region| region_to_string(region, lines))),
             ignored_intervals: data.map(|d| bracketed(&d.ignored, range_to_string)),
         }
     }
@@ -117,7 +120,7 @@ impl PairRow {
 ///
 /// - `leftFileId`, `rightFileId`: the ids of the two files in `files.csv`.
 /// - `leftRegion`, `rightRegion`: the fragment in each file, as
-///   `[startRow,startCol,endRow,endCol]`.
+///   `[startRow,startCol,endRow,endCol]`. A column is a UTF-16 code unit offset in its line.
 /// - `fingerprintCount`: the number of fingerprints in the fragment.
 #[derive(Serialize)]
 pub struct FragmentRow {
@@ -137,12 +140,13 @@ impl FragmentRow {
         "fingerprintCount",
     ];
 
-    pub fn new(pair: &Pair, fragment: &Fragment) -> Self {
+    /// `left_lines` and `right_lines` are the lines of the left and the right file of `pair`.
+    pub fn new(pair: &Pair, fragment: &Fragment, left_lines: &Lines, right_lines: &Lines) -> Self {
         Self {
             left_file_id: pair.left_file.id,
             right_file_id: pair.right_file.id,
-            left_region: region_to_string(&fragment.left_region),
-            right_region: region_to_string(&fragment.right_region),
+            left_region: region_to_string(&fragment.left_region, left_lines),
+            right_region: region_to_string(&fragment.right_region, right_lines),
             fingerprint_count: fragment.fingerprint_count,
         }
     }
@@ -156,12 +160,48 @@ fn range_to_string(range: &Range<usize>) -> String {
     format!("[{},{}]", range.start, range.end)
 }
 
-fn region_to_string(region: &Region) -> String {
+/// The lines of the content of a file, split at `\n`.
+pub struct Lines<'a>(Vec<&'a str>);
+
+impl<'a> Lines<'a> {
+    pub fn new(content: &'a str) -> Self {
+        Self(content.split('\n').collect())
+    }
+
+    /// Convert the byte column of `point` into a UTF-16 code unit offset in its line.
+    fn utf16_column(&self, point: Point) -> usize {
+        let line = self.0.get(point.row).copied().unwrap_or_default();
+        line.char_indices()
+            .take_while(|(byte, _)| *byte < point.column)
+            .map(|(_, c)| c.len_utf16())
+            .sum()
+    }
+}
+
+/// Format `region` as `[startRow,startCol,endRow,endCol]`, with UTF-16 columns.
+///
+/// `lines` are the lines of the file that holds `region`.
+fn region_to_string(region: &Region, lines: &Lines) -> String {
     format!(
         "[{},{},{},{}]",
         region.start_point.row,
-        region.start_point.column,
+        lines.utf16_column(region.start_point),
         region.end_point.row,
-        region.end_point.column,
+        lines.utf16_column(region.end_point),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn region_to_string_writes_utf16_columns() {
+        // The second `let` starts at byte 18: "é" is 2 bytes and "😀" is 4 bytes.
+        // In UTF-16, "é" is 1 code unit and "😀" is 2 code units.
+        let lines = Lines::new("// €\nlet s = \"é😀\"; let t = 1;\n");
+        let region = Region::new(Point::new(1, 18), Point::new(1, 28));
+
+        assert_eq!(region_to_string(&region, &lines), "[1,15,1,25]");
+    }
 }
