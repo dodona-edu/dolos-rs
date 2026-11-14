@@ -93,7 +93,8 @@ impl InfoColumns {
         }
     }
 
-    /// Read the [`InfoRow`] of one row. An empty value gives `None`.
+    /// Read the [`InfoRow`] of one row. An empty value gives `None`. Only the
+    /// value `true` in the `ignored` column marks the row as ignored.
     fn read(&self, record: &StringRecord) -> InfoRow {
         let value = |column: Option<usize>| record.get(column?).filter(|value| !value.is_empty());
         let info = FileInfo {

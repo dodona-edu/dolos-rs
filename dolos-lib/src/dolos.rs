@@ -45,9 +45,9 @@ impl Dolos {
     ///     `.tbz`, `.tbz2`): extracted, then read as a directory.
     ///
     ///   The `full_name`, `labels`, `label` and `created_at` columns of the CSV
-    ///   file fill the [`FileInfo`](crate::FileInfo) of each file. A row with
-    ///   `true` in the `ignored` column gives a template file: the file is not
-    ///   analyzed, and it is added to the
+    ///   file fill the [`FileInfo`](crate::FileInfo) of each file. The file of a
+    ///   row with `true` in the `ignored` column is not analyzed. It is a
+    ///   template file, used together with the files of the
     ///   [`template`](crate::DolosConfigBuilder::template).
     /// - `config`: the analysis configuration. See [`DolosConfig::builder`].
     ///
