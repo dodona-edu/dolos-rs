@@ -46,16 +46,16 @@ impl<'a> FileRow<'a> {
         "ignoredIntervals",
     ];
 
-    pub fn new(file: &'a File) -> Self {
+    /// `lines` are the lines of `file`.
+    pub fn new(file: &'a File, lines: &Lines) -> Self {
         let data = file.analysis_data.as_ref();
-        let lines = Lines::new(&file.content);
         Self {
             id: file.id,
             path: file.relative_path.to_string_lossy(),
             content: &file.content,
             fingerprints: data.map(|d| bracketed(&d.fingerprints, usize::to_string)),
             fingerprint_regions: data
-                .map(|d| bracketed(&d.regions, |region| region_to_string(region, &lines))),
+                .map(|d| bracketed(&d.regions, |region| region_to_string(region, lines))),
             ignored_intervals: data.map(|d| bracketed(&d.ignored, range_to_string)),
         }
     }

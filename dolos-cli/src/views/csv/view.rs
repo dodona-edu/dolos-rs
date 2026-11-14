@@ -28,7 +28,18 @@ impl CsvView {
             .map(|(property, value)| MetadataRow::new(property, value));
         write_table(&dir.file("metadata.csv"), &MetadataRow::HEADER, metadata)?;
 
-        let files = report.files.iter().map(|file| FileRow::new(file));
+        // The lines of every file, indexed by file id.
+        let lines: Vec<Lines> = report
+            .files
+            .iter()
+            .map(|file| Lines::new(&file.content))
+            .collect();
+
+        let files = report
+            .files
+            .iter()
+            .zip(&lines)
+            .map(|(file, lines)| FileRow::new(file, lines));
         write_table(&dir.file("files.csv"), &FileRow::HEADER, files)?;
 
         let file_count = report.files.len();
@@ -40,11 +51,12 @@ impl CsvView {
 
         if report.metadata.include_fragments {
             let fragments = report.pairs.iter().flat_map(|pair| {
-                let left_lines = Lines::new(&pair.left_file.content);
-                let right_lines = Lines::new(&pair.right_file.content);
-                pair.fragments.iter().flatten().map(move |fragment| {
-                    FragmentRow::new(pair, fragment, &left_lines, &right_lines)
-                })
+                let left_lines = &lines[pair.left_file.id];
+                let right_lines = &lines[pair.right_file.id];
+                pair.fragments
+                    .iter()
+                    .flatten()
+                    .map(move |fragment| FragmentRow::new(pair, fragment, left_lines, right_lines))
             });
 
             write_table(&dir.file("fragments.csv"), &FragmentRow::HEADER, fragments)?;
