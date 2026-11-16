@@ -1,9 +1,9 @@
-use crate::file::{File, FileSet, read_text};
+use crate::file::File;
 use std::io::{Error, ErrorKind, Result};
 use std::path::PathBuf;
 use tree_sitter_grammars::Language;
 
-use super::{Input, list_paths, resolve};
+use super::{Input, resolve};
 
 /// A named collection of read source files in one language, ready for analysis.
 pub struct Dataset {
@@ -19,32 +19,23 @@ impl Dataset {
     /// [`Input::read`] accepts.
     ///
     /// Only the files of `language` are kept. When `language` is `None`, the
-    /// language that most file extensions belong to is used. A file that cannot
-    /// be read as UTF-8 text is skipped with a warning. Without a name from the
-    /// input, the dataset is named after the files that remain.
+    /// language that most file extensions belong to is used. The other files,
+    /// and the files that cannot be read, are skipped with a warning. Without a
+    /// name from the input, the dataset is named after the files that remain.
     ///
     /// # Errors
     /// Fails when the paths cannot be read, the language cannot be detected or
     /// fewer than 2 readable files remain.
     pub fn create(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
         // `_temp_dir` keeps an extracted archive until its files are read.
-        let Input { name, mut file_set, temp_dir: _temp_dir } = Input::read(paths)?;
+        let Input { name, file_set, temp_dir: _temp_dir } = Input::read(paths)?;
 
         let language = match language {
             Some(language) => language,
             None => file_set.detect_language()?,
         };
 
-        let other_language = file_set.retain_language(language);
-        if !other_language.is_empty() {
-            tracing::warn!(
-                "skipped the files that are not {}: {}",
-                language.name(),
-                list_paths(&other_language)
-            );
-        }
-
-        let files = read_files(&file_set);
+        let files = file_set.read_files(language, "file");
         if files.len() < 2 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
@@ -58,23 +49,6 @@ impl Dataset {
         });
         Ok(Self { name, files, language })
     }
-}
-
-/// Read every file of `file_set`. Skip a file that cannot be read as UTF-8 text, with a warning.
-fn read_files(file_set: &FileSet) -> Vec<File> {
-    let mut files = Vec::new();
-    for relative_path in &file_set.relative_paths {
-        match read_text(&file_set.base_dir.join(relative_path)) {
-            Ok(content) => files.push(File {
-                id: files.len(),
-                relative_path: relative_path.clone(),
-                content,
-                analysis_data: None,
-            }),
-            Err(e) => tracing::warn!("skipped '{}': {e}", relative_path.display()),
-        }
-    }
-    files
 }
 
 #[cfg(test)]
@@ -186,7 +160,7 @@ mod tests {
     }
 
     #[test]
-    fn create_skips_a_file_that_is_not_utf8() {
+    fn create_skips_a_file_that_cannot_be_read() {
         let dir = tempfile::TempDir::new().unwrap();
         std::fs::copy("fixtures/sample1.js", dir.path().join("a.js")).unwrap();
         std::fs::copy("fixtures/sample2.js", dir.path().join("b.js")).unwrap();

@@ -30,8 +30,9 @@ impl Dolos {
     /// Only the files of the configured language are analyzed. Without a
     /// configured language, the language that most file extensions belong to is
     /// used. Plain text ([`Language::Char`]) is used only when no file belongs
-    /// to another language. An input file that cannot be read as UTF-8 text is
-    /// skipped, with a warning through the [`tracing`] crate.
+    /// to another language. The files of another language, and the files that
+    /// cannot be read, are skipped with a warning through the [`tracing`]
+    /// crate. This holds for the input and the template.
     ///
     /// # Parameters
     ///
@@ -76,9 +77,8 @@ impl Dolos {
     ///
     /// - The errors of reading the input. An empty list gives no error: the
     ///   analysis then has no template.
-    /// - [`InvalidInput`] when no template file of the language remains.
-    /// - The error of the read when a template file cannot be read, for
-    ///   example [`InvalidData`] for a file that is not valid UTF-8.
+    /// - [`InvalidInput`] when no readable template file of the language
+    ///   remains.
     ///
     /// [`InvalidData`]: std::io::ErrorKind::InvalidData
     /// [`InvalidInput`]: std::io::ErrorKind::InvalidInput
@@ -132,10 +132,7 @@ impl Dolos {
             dolos.add_file(file);
         }
 
-        for content in &template.contents {
-            let (fingerprints, _) = dolos.fingerprint(content, false);
-            dolos.template_fingerprints.push(fingerprints);
-        }
+        dolos.add_template(&template.files);
 
         Ok(dolos)
     }
@@ -155,7 +152,7 @@ impl Dolos {
         )
     }
 
-    /// Tokenize a read input file and register it as a file of the analysis.
+    /// Tokenize an input file and register it as a file of the analysis.
     ///
     /// The file is added to `self.files`, the fingerprints to `self.fingerprints`,
     /// and the locations to `self.locations` when they are kept.
@@ -167,6 +164,18 @@ impl Dolos {
             locs.push(locations.expect("locations should be present when they are kept"));
         }
         self.files.push(file);
+    }
+
+    /// Tokenize the template files and append their fingerprints to
+    /// `self.template_fingerprints`.
+    ///
+    /// Template files are never added to `self.files` or `self.locations`: they
+    /// do not appear in the report, and no fragment resolution is needed for them.
+    fn add_template(&mut self, files: &[File]) {
+        for file in files {
+            let (fingerprints, _) = self.fingerprint(&file.content, false);
+            self.template_fingerprints.push(fingerprints);
+        }
     }
 
     /// Fill in the analysis data of every file.

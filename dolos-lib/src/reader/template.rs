@@ -1,60 +1,43 @@
 use crate::error::context;
-use crate::file::read_text;
+use crate::file::File;
 use std::io::{Error, ErrorKind, Result};
 use std::path::PathBuf;
 use tree_sitter_grammars::Language;
 
-use super::{Input, list_paths};
+use super::Input;
 
 /// The read template files in one language, whose fingerprints the analysis ignores.
 pub struct Template {
-    /// The contents of the template files.
-    pub contents: Vec<String>,
+    /// The files in input order.
+    pub files: Vec<File>,
 }
 
 impl Template {
     /// Read the template from `paths`, in the forms that [`Input::read`]
-    /// accepts, and keep only the files of `language`. Without paths, the
-    /// template is empty.
+    /// accepts, and keep only the files of `language`. The other files, and the
+    /// files that cannot be read, are skipped with a warning.
+    /// Without paths, the template is empty.
     ///
     /// # Errors
-    /// Fails when the paths or a template file cannot be read, or no file of
-    /// `language` remains.
+    /// Fails when the paths cannot be read or no readable file of `language`
+    /// remains.
     pub fn create(paths: Vec<PathBuf>, language: Language) -> Result<Self> {
         if paths.is_empty() {
-            return Ok(Self { contents: Vec::new() });
+            return Ok(Self { files: Vec::new() });
         }
 
         // `_temp_dir` keeps an extracted archive until its files are read.
-        let Input { mut file_set, temp_dir: _temp_dir, .. } =
+        let Input { file_set, temp_dir: _temp_dir, .. } =
             Input::read(paths).map_err(|e| context(e, "could not read the template"))?;
 
-        let other_language = file_set.retain_language(language);
-        if !other_language.is_empty() {
-            tracing::warn!(
-                "skipped the template files that are not {}: {}",
-                language.name(),
-                list_paths(&other_language)
-            );
-        }
-        if file_set.relative_paths.is_empty() {
+        let files = file_set.read_files(language, "template file");
+        if files.is_empty() {
             return Err(Error::new(
                 ErrorKind::InvalidInput,
                 format!("the template has no {} files", language.name()),
             ));
         }
 
-        let contents = file_set
-            .relative_paths
-            .iter()
-            .map(|relative| {
-                read_text(&file_set.base_dir.join(relative)).map_err(|e| {
-                    let message =
-                        format!("could not read the template file '{}'", relative.display());
-                    context(e, message)
-                })
-            })
-            .collect::<Result<_>>()?;
-        Ok(Self { contents })
+        Ok(Self { files })
     }
 }

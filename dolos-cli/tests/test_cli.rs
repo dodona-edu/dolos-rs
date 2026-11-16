@@ -297,7 +297,37 @@ fn unreadable_files_are_skipped_with_a_warning() {
     dolos_run(&[tmp.path().to_str().unwrap()], &[])
         .assert()
         .success()
-        .stderr("warning: skipped 'c.js': the file is not UTF-8 text\n");
+        .stderr(predicate::str::starts_with(
+            "warning: skipped file 'c.js': ",
+        ));
+}
+
+#[test]
+fn unreadable_template_files_are_skipped_with_a_warning() {
+    let tmp = TempDir::new().unwrap();
+    std::fs::copy(SAMPLE1, tmp.path().join("a.js")).unwrap();
+    std::fs::write(tmp.path().join("b.js"), b"let x = \"\xff\";").unwrap();
+
+    let template = tmp.path().to_str().unwrap();
+    dolos_run(&[SAMPLE1, SAMPLE2], &["-t", template])
+        .assert()
+        .success()
+        .stderr(predicate::str::starts_with(
+            "warning: skipped template file 'b.js': ",
+        ));
+}
+
+#[test]
+fn files_of_another_language_are_skipped_with_a_warning() {
+    let tmp = TempDir::new().unwrap();
+    std::fs::copy(SAMPLE1, tmp.path().join("a.js")).unwrap();
+    std::fs::copy(SAMPLE2, tmp.path().join("b.js")).unwrap();
+    std::fs::write(tmp.path().join("README.md"), "notes").unwrap();
+
+    dolos_run(&[tmp.path().to_str().unwrap()], &[])
+        .assert()
+        .success()
+        .stderr("warning: skipped files that are not JavaScript: README.md\n");
 }
 
 #[test]

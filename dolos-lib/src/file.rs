@@ -5,19 +5,8 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::io::{Error, ErrorKind, Result};
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tree_sitter_grammars::Language;
-
-/// Read the text file at `path`.
-///
-/// # Errors
-/// Fails when the file cannot be read, or with [`ErrorKind::InvalidData`] when it is not UTF-8 text.
-pub(crate) fn read_text(path: &Path) -> Result<String> {
-    std::fs::read_to_string(path).map_err(|e| match e.kind() {
-        ErrorKind::InvalidData => Error::new(ErrorKind::InvalidData, "the file is not UTF-8 text"),
-        _ => e,
-    })
-}
 
 /// One input file of an analysis.
 #[derive(Clone)]
@@ -157,11 +146,57 @@ impl FileSet {
 
     /// Keep only the files whose extension belongs to `language`, and return the other files.
     pub fn retain_language(&mut self, language: Language) -> Vec<PathBuf> {
-        let (kept, skipped) = std::mem::take(&mut self.relative_paths)
+        let (kept, removed) = std::mem::take(&mut self.relative_paths)
             .into_iter()
             .partition(|path| language.matches(path));
         self.relative_paths = kept;
-        skipped
+        removed
+    }
+
+    /// Keep the files of `language` and read them, in order.
+    ///
+    /// Skip, with a warning, the files of another language and the files that
+    /// cannot be read. `noun` names the files in the warnings, such as
+    /// `template file`.
+    pub fn read_files(mut self, language: Language, noun: &str) -> Vec<File> {
+        let other_language = self.retain_language(language);
+        if !other_language.is_empty() {
+            tracing::warn!(
+                "skipped {noun}s that are not {}: {}",
+                language.name(),
+                list_paths(&other_language)
+            );
+        }
+
+        let mut files = Vec::new();
+        for relative_path in self.relative_paths {
+            match std::fs::read_to_string(self.base_dir.join(&relative_path)) {
+                Ok(content) => files.push(File {
+                    id: files.len(),
+                    relative_path,
+                    content,
+                    analysis_data: None,
+                }),
+                Err(e) => tracing::warn!("skipped {noun} '{}': {e}", relative_path.display()),
+            }
+        }
+        files
+    }
+}
+
+/// The number of paths that [`list_paths`] names.
+const LISTED_PATHS: usize = 3;
+
+/// List the first paths for a message, such as `a.md, b.txt, c.csv and 2 more`.
+fn list_paths(paths: &[PathBuf]) -> String {
+    let listed: Vec<String> = paths
+        .iter()
+        .take(LISTED_PATHS)
+        .map(|path| path.display().to_string())
+        .collect();
+    match paths.len().saturating_sub(LISTED_PATHS) {
+        0 => listed.join(", "),
+        more => format!("{} and {more} more", listed.join(", ")),
     }
 }
 
@@ -207,18 +242,26 @@ mod tests {
     #[test]
     fn retain_language_keeps_matching_files() {
         let mut files = file_set(&["a.cpp", "README.md", "b.h", ".gitignore", "Makefile"]);
-        let skipped = files.retain_language(Language::Cpp);
+        let removed = files.retain_language(Language::Cpp);
         assert_eq!(
             files.relative_paths,
             [PathBuf::from("a.cpp"), PathBuf::from("b.h")]
         );
         assert_eq!(
-            skipped,
+            removed,
             [
                 PathBuf::from("README.md"),
                 PathBuf::from(".gitignore"),
                 PathBuf::from("Makefile")
             ]
         );
+    }
+
+    #[rstest]
+    #[case::few(&["a.md", "b.txt"], "a.md, b.txt")]
+    #[case::many(&["a.md", "b.txt", "c.csv", "d", "e"], "a.md, b.txt, c.csv and 2 more")]
+    fn list_paths_names_the_first_paths(#[case] paths: &[&str], #[case] expected: &str) {
+        let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
+        assert_eq!(list_paths(&paths), expected);
     }
 }
