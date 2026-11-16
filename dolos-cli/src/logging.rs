@@ -11,9 +11,7 @@ use tracing_subscriber::util::SubscriberInitExt;
 /// Print the events of the `dolos` crates on stderr, from `level` up.
 ///
 /// A warning prints as `warning: message` and an error as `error: message`.
-/// Errors always print.
 pub fn init(level: LevelFilter) {
-    let level = level.max(LevelFilter::ERROR);
     tracing_subscriber::registry()
         .with(EventLayer.with_filter(Targets::new().with_target("dolos", level)))
         .init();
@@ -41,10 +39,6 @@ struct Fields {
 }
 
 impl Visit for Fields {
-    fn record_str(&mut self, field: &Field, value: &str) {
-        self.record_debug(field, &format_args!("{value}"));
-    }
-
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
         if field.name() == "message" {
             self.message = format!("{value:?}");

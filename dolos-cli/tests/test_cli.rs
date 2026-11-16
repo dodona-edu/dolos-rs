@@ -288,6 +288,14 @@ fn library_errors_print_only_the_message() {
 }
 
 #[test]
+fn silent_hides_the_errors() {
+    dolos_run(&[SAMPLE1, SAMPLE2], &["-l", "python", "-qqq"])
+        .assert()
+        .code(1)
+        .stderr("");
+}
+
+#[test]
 fn unreadable_files_are_skipped_with_a_warning() {
     let tmp = TempDir::new().unwrap();
     std::fs::copy(SAMPLE1, tmp.path().join("a.js")).unwrap();
