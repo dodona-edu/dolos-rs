@@ -75,10 +75,9 @@ impl Dolos {
     ///
     /// Reading the [`template`](crate::DolosConfigBuilder::template):
     ///
-    /// - The errors of reading the input. An empty list gives no error: the
-    ///   analysis then has no template.
-    /// - [`InvalidInput`] when no readable template file of the language
-    ///   remains.
+    /// - The errors of reading the input. An empty list gives no error. Neither
+    ///   does a template without readable files of the language: the analysis
+    ///   then has no template.
     ///
     /// [`InvalidData`]: std::io::ErrorKind::InvalidData
     /// [`InvalidInput`]: std::io::ErrorKind::InvalidInput

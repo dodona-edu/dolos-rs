@@ -1,6 +1,6 @@
 use crate::error::context;
 use crate::file::File;
-use std::io::{Error, ErrorKind, Result};
+use std::io::Result;
 use std::path::PathBuf;
 use tree_sitter_grammars::Language;
 
@@ -19,8 +19,7 @@ impl Template {
     /// Without paths, the template is empty.
     ///
     /// # Errors
-    /// Fails when the paths cannot be read or no readable file of `language`
-    /// remains.
+    /// Fails when the paths cannot be read.
     pub fn create(paths: Vec<PathBuf>, language: Language) -> Result<Self> {
         if paths.is_empty() {
             return Ok(Self { files: Vec::new() });
@@ -31,13 +30,6 @@ impl Template {
             Input::read(paths).map_err(|e| context(e, "could not read the template"))?;
 
         let files = file_set.read_files(language, "template file");
-        if files.is_empty() {
-            return Err(Error::new(
-                ErrorKind::InvalidInput,
-                format!("the template has no {} files", language.name()),
-            ));
-        }
-
         Ok(Self { files })
     }
 }
