@@ -127,12 +127,10 @@ impl Input {
             .relative_paths
             .into_iter()
             .partition(|path| language.matches(path));
-        if !other_language.is_empty() {
-            tracing::warn!(
-                "skipped {noun}s that are not {}: {}",
-                language.name(),
-                list_paths(&other_language)
-            );
+        match other_language.len() {
+            0 => {}
+            1 => tracing::warn!("skipped 1 {noun} that is not {}", language.name()),
+            count => tracing::warn!("skipped {count} {noun}s that are not {}", language.name()),
         }
 
         let mut files = Vec::new();
@@ -148,22 +146,6 @@ impl Input {
             }
         }
         files
-    }
-}
-
-/// The number of paths that [`list_paths`] names.
-const LISTED_PATHS: usize = 3;
-
-/// List the first paths for a message, such as `a.md, b.txt, c.csv and 2 more`.
-fn list_paths(paths: &[PathBuf]) -> String {
-    let listed: Vec<String> = paths
-        .iter()
-        .take(LISTED_PATHS)
-        .map(|path| path.display().to_string())
-        .collect();
-    match paths.len().saturating_sub(LISTED_PATHS) {
-        0 => listed.join(", "),
-        more => format!("{} and {more} more", listed.join(", ")),
     }
 }
 
@@ -225,13 +207,5 @@ mod tests {
             .read_files(Language::Javascript, "file");
         let paths: Vec<&Path> = files.iter().map(|f| f.relative_path.as_path()).collect();
         assert_eq!(paths, [Path::new("fixtures/sample1.js")]);
-    }
-
-    #[rstest]
-    #[case::few(&["a.md", "b.txt"], "a.md, b.txt")]
-    #[case::many(&["a.md", "b.txt", "c.csv", "d", "e"], "a.md, b.txt, c.csv and 2 more")]
-    fn list_paths_names_the_first_paths(#[case] paths: &[&str], #[case] expected: &str) {
-        let paths: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
-        assert_eq!(list_paths(&paths), expected);
     }
 }

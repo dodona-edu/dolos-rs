@@ -335,7 +335,7 @@ fn files_of_another_language_are_skipped_with_a_warning() {
     dolos_run(&[tmp.path().to_str().unwrap()], &[])
         .assert()
         .success()
-        .stderr("warning: skipped files that are not JavaScript: README.md\n");
+        .stderr("warning: skipped 1 file that is not JavaScript\n");
 }
 
 #[test]
