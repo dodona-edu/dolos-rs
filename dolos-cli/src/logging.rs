@@ -1,4 +1,4 @@
-use anstyle::{AnsiColor, Effects, Style};
+use anstyle::{AnsiColor, Style};
 use indicatif::{ProgressBar, ProgressStyle};
 use std::fmt;
 use std::io::{IsTerminal, Result, Write};
@@ -46,15 +46,14 @@ where
             return;
         };
 
-        let spinner = if self.terminal {
-            start_spinner(description)
-        } else {
+        if !self.terminal {
             // A failed write to stderr cannot be reported, so it is ignored.
             let _ = writeln!(anstream::stderr().lock(), "{description}");
-            ProgressBar::hidden()
-        };
-        let failed = fields.error.is_some();
-        span.extensions_mut().insert(Step { spinner, failed });
+            return;
+        }
+        let spinner = start_spinner(description);
+        span.extensions_mut()
+            .insert(Step { spinner, failed: false });
     }
 
     fn on_record(&self, id: &Id, values: &Record<'_>, ctx: Context<'_, S>) {
@@ -101,18 +100,21 @@ where
         else {
             return;
         };
-        let (mark, template) = if step.failed {
-            ("✘", "{prefix:.red.bold} {msg}")
+        let (mark, style) = if step.failed {
+            ("✘", AnsiColor::Red.on_default().bold())
         } else {
-            ("✔", "{prefix:.green.bold} {msg}")
+            ("✔", AnsiColor::Green.on_default().bold())
         };
+        let description = step.spinner.message();
         let seconds = step.spinner.elapsed().as_secs_f64();
-        let dim = Style::new().effects(Effects::DIMMED);
-        let message = format!("{} {dim}{seconds:.1}s{dim:#}", step.spinner.message());
-        let style = ProgressStyle::with_template(template).expect("the template is valid");
-        step.spinner.set_style(style);
-        step.spinner.set_prefix(mark);
-        step.spinner.finish_with_message(message);
+        let line = format!(
+            "{style}{mark}{style:#} {description} {dimmed}{seconds:.1}s{dimmed:#}",
+            dimmed = Style::new().dimmed(),
+        );
+
+        let template = ProgressStyle::with_template("{msg}").expect("the template is valid");
+        step.spinner.set_style(template);
+        step.spinner.finish_with_message(line);
     }
 }
 
@@ -155,8 +157,6 @@ fn write_event(out: &mut impl Write, level: Level, message: &str) -> Result<()> 
         Level::DEBUG => ("debug", AnsiColor::Blue),
         Level::TRACE => ("trace", AnsiColor::Cyan),
     };
-    let style = Style::new()
-        .fg_color(Some(color.into()))
-        .effects(Effects::BOLD);
+    let style = color.on_default().bold();
     writeln!(out, "{style}{prefix}:{style:#} {message}")
 }
