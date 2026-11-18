@@ -3,7 +3,7 @@ use crate::file::{AnalysisData, File};
 use crate::fragment::resolve_fragments;
 use crate::ignore;
 use crate::metadata::Metadata;
-use crate::reader::{Dataset, Template};
+use crate::reader::{Source, Template};
 use crate::report::Report;
 use crate::winnowing::fingerprints::{Fingerprint, winnow};
 use crate::winnowing::region::Region;
@@ -103,14 +103,14 @@ impl Dolos {
     /// # fn main() {}
     /// ```
     pub fn new(files: Vec<PathBuf>, config: DolosConfig) -> Result<Self> {
-        let dataset = Dataset::create(files, config.language)?;
-        if config.max_fingerprint_percentage.is_some() && dataset.files.len() < 3 {
+        let source = Source::create(files, config.language)?;
+        if config.max_fingerprint_percentage.is_some() && source.files.len() < 3 {
             tracing::warn!(
                 "the maximum fingerprint percentage has no use with fewer than 3 files; \
                  it ignores every shared fingerprint or none"
             );
         }
-        let metadata = Metadata::from_config(&config, &dataset);
+        let metadata = Metadata::from_config(&config, &source);
         let template = Template::create(config.template, metadata.language)?;
 
         let tokenizer = Tokenizer::new(metadata.language, metadata.include_comments);
@@ -127,7 +127,7 @@ impl Dolos {
             tokenizer,
         };
 
-        for file in dataset.files {
+        for file in source.files {
             dolos.add_file(file);
         }
 

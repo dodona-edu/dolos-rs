@@ -6,7 +6,7 @@ use tree_sitter_grammars::Language;
 use super::{Input, resolve};
 
 /// A named collection of read source files in one language, ready for analysis.
-pub struct Dataset {
+pub struct Source {
     pub name: String,
     /// The files in input order. Their paths are relative to the input
     /// directory, the directory of the CSV file or the extracted archive.
@@ -14,14 +14,14 @@ pub struct Dataset {
     pub language: Language,
 }
 
-impl Dataset {
-    /// Create a `Dataset` from the given input paths, in the forms that
+impl Source {
+    /// Create a `Source` from the given input paths, in the forms that
     /// [`Input::read`] accepts.
     ///
     /// Only the files of `language` are kept. When `language` is `None`, the
     /// language that most file extensions belong to is used. The other files,
     /// and the files that cannot be read, are skipped with a warning. Without a
-    /// name from the input, the dataset is named after the files that remain.
+    /// name from the input, the source is named after the files that remain.
     ///
     /// # Errors
     /// Fails when the paths cannot be read, the language cannot be detected or
@@ -56,8 +56,8 @@ mod tests {
     use super::*;
     use rstest::rstest;
 
-    fn relative_paths(dataset: &Dataset) -> Vec<PathBuf> {
-        dataset
+    fn relative_paths(source: &Source) -> Vec<PathBuf> {
+        source
             .files
             .iter()
             .map(|f| f.relative_path.clone())
@@ -66,12 +66,12 @@ mod tests {
 
     #[test]
     fn create_rejects_empty_input() {
-        assert!(Dataset::create(vec![], None).is_err());
+        assert!(Source::create(vec![], None).is_err());
     }
 
     #[test]
     fn create_rejects_a_single_regular_file() {
-        let err = Dataset::create(vec!["fixtures/sample1.js".into()], None)
+        let err = Source::create(vec!["fixtures/sample1.js".into()], None)
             .err()
             .unwrap();
         assert!(err.to_string().contains("at least 2"), "{err}");
@@ -79,13 +79,13 @@ mod tests {
 
     #[test]
     fn create_reads_loose_files() {
-        let dataset = Dataset::create(
+        let source = Source::create(
             vec!["fixtures/sample1.js".into(), "fixtures/sample2.js".into()],
             None,
         )
         .unwrap();
         assert_eq!(
-            relative_paths(&dataset),
+            relative_paths(&source),
             vec![
                 PathBuf::from("fixtures/sample1.js"),
                 PathBuf::from("fixtures/sample2.js"),
@@ -95,7 +95,7 @@ mod tests {
 
     #[test]
     fn create_names_many_files_by_count() {
-        let dataset = Dataset::create(
+        let source = Source::create(
             vec![
                 "fixtures/sample1.js".into(),
                 "fixtures/sample2.js".into(),
@@ -104,13 +104,13 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(dataset.name, "3 files");
-        assert_eq!(dataset.files.len(), 3);
+        assert_eq!(source.name, "3 files");
+        assert_eq!(source.files.len(), 3);
     }
 
     #[test]
     fn create_names_the_files_left_after_filtering() {
-        let dataset = Dataset::create(
+        let source = Source::create(
             vec![
                 "fixtures/sample1.js".into(),
                 "fixtures/sample2.js".into(),
@@ -119,25 +119,25 @@ mod tests {
             None,
         )
         .unwrap();
-        assert_eq!(dataset.name, "sample1.js-sample2.js");
+        assert_eq!(source.name, "sample1.js-sample2.js");
     }
 
     #[test]
     fn create_reads_a_directory() {
-        let dataset = Dataset::create(vec!["fixtures/reader".into()], None).unwrap();
-        assert_eq!(dataset.name, "reader");
+        let source = Source::create(vec!["fixtures/reader".into()], None).unwrap();
+        assert_eq!(source.name, "reader");
         assert_eq!(
-            relative_paths(&dataset),
+            relative_paths(&source),
             vec![PathBuf::from("sample1.js"), PathBuf::from("sample2.js"),]
         );
     }
 
     #[test]
     fn create_reads_a_csv_file() {
-        let dataset = Dataset::create(vec!["fixtures/reader/info.csv".into()], None).unwrap();
-        assert_eq!(dataset.name, "reader");
+        let source = Source::create(vec!["fixtures/reader/info.csv".into()], None).unwrap();
+        assert_eq!(source.name, "reader");
         assert_eq!(
-            relative_paths(&dataset),
+            relative_paths(&source),
             vec![PathBuf::from("sample1.js"), PathBuf::from("sample2.js"),]
         );
     }
@@ -148,10 +148,10 @@ mod tests {
     #[case::tar_gz("fixtures/reader.tar.gz")]
     #[case::tar_bz2("fixtures/reader.tar.bz2")]
     fn create_reads_an_archive(#[case] path: &str) {
-        let dataset = Dataset::create(vec![path.into()], None).unwrap();
-        assert_eq!(dataset.name, "reader");
+        let source = Source::create(vec![path.into()], None).unwrap();
+        assert_eq!(source.name, "reader");
 
-        let mut files = relative_paths(&dataset);
+        let mut files = relative_paths(&source);
         files.sort();
         assert_eq!(
             files,
@@ -166,9 +166,9 @@ mod tests {
         std::fs::copy("fixtures/sample2.js", dir.path().join("b.js")).unwrap();
         std::fs::write(dir.path().join("c.js"), b"let x = \"\xff\";").unwrap();
 
-        let dataset = Dataset::create(vec![dir.path().into()], None).unwrap();
+        let source = Source::create(vec![dir.path().into()], None).unwrap();
 
-        let mut files = relative_paths(&dataset);
+        let mut files = relative_paths(&source);
         files.sort();
         assert_eq!(files, vec![PathBuf::from("a.js"), PathBuf::from("b.js")]);
     }
