@@ -13,7 +13,7 @@ pub struct Template {
 }
 
 impl Template {
-    /// Read the template from `paths`, in the forms that [`Input::read`]
+    /// Read the template from `paths`, in the forms that [`Input::open`]
     /// accepts, and keep only the files of `language`. The other files, and the
     /// files that cannot be read, are skipped with a warning.
     /// Without paths, the template is empty.
@@ -25,11 +25,9 @@ impl Template {
             return Ok(Self { files: Vec::new() });
         }
 
-        // `_temp_dir` keeps an extracted archive until its files are read.
-        let Input { file_set, temp_dir: _temp_dir, .. } =
-            Input::read(paths).map_err(|e| context(e, "could not read the template"))?;
-
-        let files = file_set.read_files(language, "template file");
+        let files = Input::open(paths)
+            .map_err(|e| context(e, "could not read the template"))?
+            .read_files(language, "template file");
         Ok(Self { files })
     }
 }

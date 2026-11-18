@@ -16,7 +16,7 @@ pub struct Source {
 
 impl Source {
     /// Create a `Source` from the given input paths, in the forms that
-    /// [`Input::read`] accepts.
+    /// [`Input::open`] accepts.
     ///
     /// Only the files of `language` are kept. When `language` is `None`, the
     /// language that most file extensions belong to is used. The other files,
@@ -27,15 +27,14 @@ impl Source {
     /// Fails when the paths cannot be read, the language cannot be detected or
     /// fewer than 2 readable files remain.
     pub fn create(paths: Vec<PathBuf>, language: Option<Language>) -> Result<Self> {
-        // `_temp_dir` keeps an extracted archive until its files are read.
-        let Input { name, file_set, temp_dir: _temp_dir } = Input::read(paths)?;
-
+        let input = Input::open(paths)?;
         let language = match language {
             Some(language) => language,
-            None => file_set.detect_language()?,
+            None => input.detect_language()?,
         };
 
-        let files = file_set.read_files(language, "file");
+        let name = input.name.clone();
+        let files = input.read_files(language, "file");
         if files.len() < 2 {
             return Err(Error::new(
                 ErrorKind::InvalidInput,

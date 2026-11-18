@@ -4,6 +4,6 @@ mod resolve;
 mod source;
 mod template;
 
-pub use input::Input;
+use input::Input;
 pub use source::Source;
 pub use template::Template;
