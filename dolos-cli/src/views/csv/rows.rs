@@ -28,7 +28,7 @@ impl<'a> MetadataRow<'a> {
 ///
 /// The last three hold the `info.csv` data of the file. A value is empty when the file has none:
 /// - `fullName`: the `full_name` column.
-/// - `labels`: the `labels` column, or the `label` column when `labels` has no value.
+/// - `labels`: the labels of the `labels` column, separated by `;`.
 /// - `createdAt`: the `created_at` column, as an RFC 3339 timestamp.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
@@ -39,7 +39,7 @@ pub struct FileRow<'a> {
     fingerprint_regions: Option<String>,
     ignored_intervals: Option<String>,
     full_name: Option<&'a str>,
-    labels: Option<&'a str>,
+    labels: String,
     created_at: Option<String>,
 }
 
@@ -66,7 +66,7 @@ impl<'a> FileRow<'a> {
             fingerprint_regions: data.map(|d| bracketed(&d.regions, region_to_string)),
             ignored_intervals: data.map(|d| bracketed(&d.ignored, range_to_string)),
             full_name: file.info.full_name.as_deref(),
-            labels: file.info.labels.as_deref(),
+            labels: file.info.labels.join(";"),
             created_at: file.info.created_at.map(|timestamp| timestamp.to_rfc3339()),
         }
     }

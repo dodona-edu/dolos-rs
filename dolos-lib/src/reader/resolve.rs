@@ -89,7 +89,6 @@ fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, FileInfo)>> {
 struct InfoColumns {
     full_name: Option<usize>,
     labels: Option<usize>,
-    label: Option<usize>,
     created_at: Option<usize>,
 }
 
@@ -99,7 +98,6 @@ impl InfoColumns {
         Self {
             full_name: position("full_name"),
             labels: position("labels"),
-            label: position("label"),
             created_at: position("created_at"),
         }
     }
@@ -109,12 +107,20 @@ impl InfoColumns {
         let value = |column: Option<usize>| record.get(column?).filter(|value| !value.is_empty());
         FileInfo {
             full_name: value(self.full_name).map(str::to_owned),
-            labels: value(self.labels)
-                .or_else(|| value(self.label))
-                .map(str::to_owned),
+            labels: value(self.labels).map(split_labels).unwrap_or_default(),
             created_at: value(self.created_at).and_then(parse_created_at),
         }
     }
+}
+
+/// Split a `labels` value at `;`, as Dodona writes it. Trim each label and skip empty labels.
+fn split_labels(value: &str) -> Vec<String> {
+    value
+        .split(';')
+        .map(str::trim)
+        .filter(|label| !label.is_empty())
+        .map(str::to_owned)
+        .collect()
 }
 
 /// Parse a timestamp in RFC 3339 or in the Dodona format `2019-07-23 17:12:33 +0200`.
@@ -189,12 +195,11 @@ mod tests {
         assert_eq!(info_of_csv("filename\na.js\n"), [FileInfo::default()]);
     }
 
-    #[rstest]
-    #[case::label_column_only("filename,label\na.js,group-1\n", "group-1")]
-    #[case::labels_first("filename,label,labels\na.js,group-1,group-2\n", "group-2")]
-    #[case::labels_empty("filename,label,labels\na.js,group-1,\n", "group-1")]
-    fn labels_column_comes_before_the_label_column(#[case] csv: &str, #[case] expected: &str) {
-        assert_eq!(info_of_csv(csv)[0].labels.as_deref(), Some(expected));
+    #[test]
+    fn labels_column_holds_labels_separated_by_semicolons() {
+        let info = info_of_csv("filename,labels\na.js,niet bst;ingeschreven\nb.js, a ;;b;\n");
+        assert_eq!(info[0].labels, ["niet bst", "ingeschreven"]);
+        assert_eq!(info[1].labels, ["a", "b"]);
     }
 
     #[rstest]

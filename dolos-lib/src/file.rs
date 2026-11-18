@@ -29,15 +29,14 @@ pub struct File {
 
 /// The data of the `info.csv` row of a file.
 ///
-/// A value is `None` when the input has no `info.csv`, when the row has no
-/// value or when the `info.csv` has no such column.
+/// A value is `None`, and `labels` is empty, when the input has no `info.csv`,
+/// when the row has no value or when the `info.csv` has no such column.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FileInfo {
     /// The value of the `full_name` column.
     pub full_name: Option<String>,
-    /// The value of the `labels` column, or of the `label` column when
-    /// `labels` has no value.
-    pub labels: Option<String>,
+    /// The labels in the `labels` column, separated by `;`, in their order in the column.
+    pub labels: Vec<String>,
     /// The value of the `created_at` column. `None` also when the value is
     /// not a timestamp in RFC 3339 or in the format `2019-07-23 17:12:33 +0200`.
     pub created_at: Option<DateTime<FixedOffset>>,

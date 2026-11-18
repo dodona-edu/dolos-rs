@@ -198,7 +198,7 @@ fn files_csv_holds_the_info_csv_data_of_each_file() {
     std::fs::write(
         dataset.join("info.csv"),
         "filename,full_name,created_at,labels\n\
-         a.js,Ada Lovelace,2019-07-23 17:12:33 +0200,group-1\n\
+         a.js,Ada Lovelace,2019-07-23 17:12:33 +0200,group-1;niet bst\n\
          b.js,,,\n",
     )
     .unwrap();
@@ -207,7 +207,7 @@ fn files_csv_holds_the_info_csv_data_of_each_file() {
 
     let files = report_dir.join("files.csv");
     assert_eq!(read_column(&files, "fullName"), ["Ada Lovelace", ""]);
-    assert_eq!(read_column(&files, "labels"), ["group-1", ""]);
+    assert_eq!(read_column(&files, "labels"), ["group-1;niet bst", ""]);
     assert_eq!(
         read_column(&files, "createdAt"),
         ["2019-07-23T17:12:33+02:00", ""]
