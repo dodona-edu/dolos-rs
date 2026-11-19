@@ -113,7 +113,7 @@ impl InfoColumns {
     }
 }
 
-/// Split a `labels` value at `;`, as Dodona writes it. Trim each label and skip empty labels.
+/// Split a `labels` value at `;`. Trim each label and skip empty labels.
 fn split_labels(value: &str) -> Vec<String> {
     value
         .split(';')
@@ -123,7 +123,7 @@ fn split_labels(value: &str) -> Vec<String> {
         .collect()
 }
 
-/// Parse a timestamp in RFC 3339 or in the Dodona format `2019-07-23 17:12:33 +0200`.
+/// Parse a timestamp in RFC 3339 or in the format `2019-07-23 17:12:33 +0200`.
 fn parse_created_at(value: &str) -> Option<DateTime<FixedOffset>> {
     DateTime::parse_from_rfc3339(value)
         .or_else(|_| DateTime::parse_from_str(value, "%Y-%m-%d %H:%M:%S %z"))
