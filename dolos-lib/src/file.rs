@@ -1,5 +1,6 @@
 use crate::winnowing::fingerprints::Fingerprint;
 use crate::winnowing::region::Region;
+use chrono::{DateTime, FixedOffset};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Range;
@@ -18,10 +19,27 @@ pub struct File {
     pub relative_path: PathBuf,
     /// Full source text of the file.
     pub content: String,
+    /// The data of the `info.csv` row of the file.
+    pub info: FileInfo,
     /// The data needed to rerun the analysis for this file. `Some` only when
     /// [`include_analysis_data`](crate::DolosConfigBuilder::include_analysis_data)
     /// is set.
     pub analysis_data: Option<AnalysisData>,
+}
+
+/// The data of the `info.csv` row of a file.
+///
+/// A value is `None`, and `labels` is empty, when the input has no `info.csv`,
+/// when the row has no value or when the `info.csv` has no such column.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FileInfo {
+    /// The value of the `full_name` column.
+    pub full_name: Option<String>,
+    /// The labels in the `labels` column, separated by `;`, in their order in the column.
+    pub labels: Vec<String>,
+    /// The value of the `created_at` column. `None` also when the value is
+    /// not a timestamp in RFC 3339 or in the format `2019-07-23 17:12:33 +0200`.
+    pub created_at: Option<DateTime<FixedOffset>>,
 }
 
 /// Everything the analysis needs for one file. With it, a pair can be analysed
