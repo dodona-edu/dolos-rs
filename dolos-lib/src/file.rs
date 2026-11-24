@@ -18,10 +18,81 @@ pub struct File {
     pub relative_path: PathBuf,
     /// Full source text of the file.
     pub content: String,
+    /// The extra columns of the `info.csv` row of the file. Empty when the file
+    /// does not come from an `info.csv`.
+    pub info: FileInfo,
     /// The data needed to rerun the analysis for this file. `Some` only when
     /// [`include_analysis_data`](crate::DolosConfigBuilder::include_analysis_data)
     /// is set.
     pub analysis_data: Option<AnalysisData>,
+}
+
+/// The columns of the `info.csv` row of a file, other than `filename`, as
+/// uninterpreted strings in the column order of the CSV file.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FileInfo {
+    columns: Vec<(String, String)>,
+}
+
+impl FileInfo {
+    /// Create a `FileInfo` from `(column, value)` pairs, in the given order.
+    ///
+    /// # Parameters
+    ///
+    /// - `columns`: the `(column, value)` pairs.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dolos::FileInfo;
+    ///
+    /// let info = FileInfo::new(vec![("full_name".into(), "Ada Lovelace".into())]);
+    /// assert_eq!(info.get("full_name"), Some("Ada Lovelace"));
+    /// ```
+    pub fn new(columns: Vec<(String, String)>) -> Self {
+        Self { columns }
+    }
+
+    /// Return the value of `column`, or `None` when the row has no such column.
+    ///
+    /// # Parameters
+    ///
+    /// - `column`: the column name in the header of the CSV file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dolos::FileInfo;
+    ///
+    /// let info = FileInfo::new(vec![("labels".into(), "group-1".into())]);
+    /// assert_eq!(info.get("labels"), Some("group-1"));
+    /// assert_eq!(info.get("full_name"), None);
+    /// ```
+    pub fn get(&self, column: &str) -> Option<&str> {
+        self.iter()
+            .find(|(name, _)| *name == column)
+            .map(|(_, value)| value)
+    }
+
+    /// Return the `(column, value)` pairs in the column order of the CSV file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use dolos::FileInfo;
+    ///
+    /// let info = FileInfo::new(vec![
+    ///     ("full_name".into(), "Ada Lovelace".into()),
+    ///     ("labels".into(), "group-1".into()),
+    /// ]);
+    /// let columns: Vec<_> = info.iter().collect();
+    /// assert_eq!(columns, [("full_name", "Ada Lovelace"), ("labels", "group-1")]);
+    /// ```
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &str)> {
+        self.columns
+            .iter()
+            .map(|(column, value)| (column.as_str(), value.as_str()))
+    }
 }
 
 /// Everything the analysis needs for one file. With it, a pair can be analysed
