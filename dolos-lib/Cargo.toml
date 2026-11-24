@@ -80,7 +80,7 @@ flate2 = "1.1.9"
 tar = "0.4.46"
 zip = "9.0.1"
 tempfile = "3.27.0"
-time = { version = "0.3.47", features = ["formatting"] }
+jiff = { version = "0.2.46", default-features = false, features = ["std"] }
 tree-sitter = "0.26.13"
 tree-sitter-grammars = { path = "../tree-sitter-grammars" }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }

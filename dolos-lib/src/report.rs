@@ -85,14 +85,14 @@ mod tests {
     use super::*;
     use crate::config::FragmentSortBy;
     use dolos_core::{AnalysisOptions, AnalysisResult};
+    use jiff::Timestamp;
     use std::path::PathBuf;
-    use time::OffsetDateTime;
     use tree_sitter_grammars::Language;
 
     fn metadata(sort_by: PairSortBy) -> Metadata {
         Metadata {
             report_name: "test".to_string(),
-            created_at: OffsetDateTime::now_utc(),
+            created_at: Timestamp::now(),
             sort_by,
             fragment_sort_by: FragmentSortBy::FileOrder,
             kgram_length: 23,
