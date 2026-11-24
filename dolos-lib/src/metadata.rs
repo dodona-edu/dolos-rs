@@ -1,8 +1,9 @@
 use crate::config::{DolosConfig, FragmentSortBy, PairSortBy};
 use crate::reader::Source;
-use chrono::{DateTime, Utc};
 use dolos_core::AnalysisOptions;
 use std::path::PathBuf;
+use time::OffsetDateTime;
+use time::format_description::well_known::Rfc3339;
 use tree_sitter_grammars::Language;
 
 /// The settings of one analysis run, as [`Report::metadata`](crate::Report::metadata).
@@ -13,8 +14,8 @@ use tree_sitter_grammars::Language;
 pub struct Metadata {
     /// The configured name, or the name of the input.
     pub report_name: String,
-    /// The time at which [`Dolos::new`](crate::Dolos::new) ran.
-    pub created_at: DateTime<Utc>,
+    /// The time at which [`Dolos::new`](crate::Dolos::new) ran, in UTC.
+    pub created_at: OffsetDateTime,
     /// The order of the pairs.
     pub sort_by: PairSortBy,
     /// The order of the fragments of each pair.
@@ -50,7 +51,7 @@ impl Metadata {
 
         Metadata {
             report_name: config.name.clone().unwrap_or_else(|| source.name.clone()),
-            created_at: Utc::now(),
+            created_at: OffsetDateTime::now_utc(),
             sort_by: config.sort_by,
             fragment_sort_by: config.fragment_sort_by,
             kgram_length: config.kgram_length,
@@ -101,7 +102,7 @@ impl Metadata {
     pub fn properties(&self) -> [(&'static str, String); 13] {
         [
             ("reportName", self.report_name.clone()),
-            ("createdAt", self.created_at.to_rfc3339()),
+            ("createdAt", rfc3339(self.created_at)),
             ("language", format!("{:?}", self.language)),
             ("kgramLength", self.kgram_length.to_string()),
             ("kgramsInWindow", self.kgrams_in_window.to_string()),
@@ -115,6 +116,12 @@ impl Metadata {
             ("template", json_list(&self.template)),
         ]
     }
+}
+
+/// Render `time` in RFC 3339 format.
+fn rfc3339(time: OffsetDateTime) -> String {
+    time.format(&Rfc3339)
+        .expect("a UTC time of the current era formats as RFC 3339")
 }
 
 /// Render `paths` as a JSON array of strings.
