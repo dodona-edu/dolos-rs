@@ -27,8 +27,9 @@ impl<'a> MetadataRow<'a> {
 ///   indices.
 ///
 /// The last column:
-/// - `info`: the columns of the `info.csv` row of the file, other than `filename`, as a JSON
-///   object in the column order of the CSV file. Empty when the file has no such columns.
+/// - `info`: the columns of the CSV row of the file (the input CSV file or the `info.csv` of a
+///   directory), other than `filename`, as a JSON object in the column order of the CSV file.
+///   Columns with the same name give duplicate keys. Empty when the file has no such columns.
 #[derive(Serialize)]
 pub struct FileRow<'a> {
     id: usize,
@@ -157,13 +158,13 @@ impl FragmentRow {
 
 /// Write the columns of `info` as a JSON object in column order. `None` when `info` is empty.
 fn info_to_json(info: &FileInfo) -> Option<String> {
-    if *info == FileInfo::default() {
+    if info.is_empty() {
         return None;
     }
     let mut json = Vec::new();
     let mut serializer = serde_json::Serializer::new(&mut json);
     serializer
-        .collect_map(info.iter())
+        .collect_map(info)
         .expect("string pairs serialize to JSON");
     Some(String::from_utf8(json).expect("serde_json writes UTF-8"))
 }

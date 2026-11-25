@@ -4,6 +4,7 @@ use csv::{Reader, StringRecord};
 use std::fs;
 use std::io::{Error, ErrorKind, Result};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 /// Resolve files from a directory. If an `info.csv` is present at the top
 /// level, it is used to determine the file list; otherwise files are collected
@@ -74,27 +75,29 @@ fn files_from_csv(csv_path: &Path) -> Result<Vec<(PathBuf, FileInfo)>> {
             let message = format!("csv file '{}' has no 'filename' column", csv_path.display());
             Error::new(ErrorKind::InvalidData, message)
         })?;
-    let headers = headers.clone();
+    let columns: Arc<[String]> = without_field(headers, filename_col)
+        .map(str::to_owned)
+        .collect();
 
     rdr.records()
         .map(|r| {
             let record = r.map_err(invalid)?;
             let path = dir.join(&record[filename_col]);
-            Ok((path, file_info(&headers, &record, filename_col)))
+            let values = without_field(&record, filename_col)
+                .map(str::to_owned)
+                .collect();
+            Ok((path, FileInfo::from_row(Arc::clone(&columns), values)))
         })
         .collect()
 }
 
-/// Pair each header with its value in `record`, without the `filename` column.
-fn file_info(headers: &StringRecord, record: &StringRecord, filename_col: usize) -> FileInfo {
-    let columns = headers
+/// Iterate over the fields of `record`, without the field at `skipped`.
+fn without_field(record: &StringRecord, skipped: usize) -> impl Iterator<Item = &str> {
+    record
         .iter()
-        .zip(record)
         .enumerate()
-        .filter(|(index, _)| *index != filename_col)
-        .map(|(_, (column, value))| (column.to_owned(), value.to_owned()))
-        .collect();
-    FileInfo::new(columns)
+        .filter(move |(index, _)| *index != skipped)
+        .map(|(_, field)| field)
 }
 
 fn collect_recursive(dir: &Path) -> Result<Vec<PathBuf>> {
